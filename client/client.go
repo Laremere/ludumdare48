@@ -175,6 +175,10 @@ func (r *render) render() {
 		}
 	}
 
+	for i := range s.sending {
+		r.draw(itemSprite[s.sending[i].i], s.sending[i].p, 0.1, 0.1)
+	}
+
 	r.draw("ship", s.ship.p, shipSize, shipSize) // ALWAYS DRAW LAST, except for UI
 
 	{
@@ -231,7 +235,9 @@ type state struct {
 	ship         transform
 	inventory    [numItems]int
 	collecting   [numItems][]transform
+	sending      []sending
 	viewx, viewy float64
+	dropCooldown float64
 	keyDown      map[key]bool
 	key          map[key]bool
 	keyUp        map[key]bool
@@ -258,6 +264,12 @@ var tileSprite = map[tile]string{
 	redirectorLeft:  "redirectorLeft",
 	redirectorRight: "redirectorRight",
 	redirectorDown:  "redirectordown",
+}
+
+type sending struct {
+	dst transform
+	p   vec
+	i   item
 }
 
 func init() {
@@ -342,6 +354,35 @@ func (s *state) step(dt float64) {
 
 		clampAndReset(&s.ship.p[0], -0.5+shipSize/2, spritesPerWidth-0.5-shipSize/2, &s.ship.v[0])
 		clampAndReset(&s.ship.p[1], -5, worldHeight, &s.ship.v[1])
+	}
+
+	{
+		if s.dropCooldown > 0 {
+			s.dropCooldown -= dt
+		}
+		if s.dropCooldown <= 0 && s.tileAt(s.ship.p.add(vec{1, 0})) == forge && s.inventory[rock] > 0 {
+			s.sending = append(s.sending, sending{
+				dst: transform{
+					p: s.ship.p.floor().add(vec{1.1, 0.45 + rand.Float64()*0.1}),
+					v: vec{0.5, 0},
+				},
+				p: s.ship.p,
+				i: rock,
+			})
+			s.inventory[rock]--
+			s.dropCooldown += 0.5
+		}
+	}
+
+	for i := 0; i < len(s.sending); i++ {
+		s.sending[i].p = s.sending[i].p.tween(s.sending[i].dst.p, dt)
+		if s.sending[i].p[0] == s.sending[i].dst.p[0] && s.sending[i].p[1] == s.sending[i].dst.p[1] {
+			s.pushItem(s.sending[i].dst, s.sending[i].i)
+			last := len(s.sending) - 1
+			s.sending[i] = s.sending[last]
+			s.sending = s.sending[:last]
+			i--
+		}
 	}
 
 	for _, rb := range s.rocks {
