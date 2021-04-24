@@ -169,8 +169,13 @@ func (r *render) render() {
 			}
 		}
 	}
+	for i := range s.collecting {
+		for j := range s.collecting[i] {
+			r.draw(itemSprite[item(i)], s.collecting[i][j].p, 0.1, 0.1)
+		}
+	}
 
-	r.draw("ship", s.ship.p, shipSize, shipSize) // ALWAYS DRAW LAST
+	r.draw("ship", s.ship.p, shipSize, shipSize) // ALWAYS DRAW LAST, except for UI
 
 	{
 		totalItems := 0
@@ -184,6 +189,11 @@ func (r *render) render() {
 		r.ctx.Set("textAlign", "30px Arial")
 		r.ctx.Call("fillText", fmt.Sprintf("Total items: %v", totalItems), 0, 30)
 		r.ctx.Call("fillText", fmt.Sprintf("X: %0.2f, Y: %0.2f", s.ship.p[0], s.ship.p[1]), 0, 60)
+		for i := item(0); i < numItems; i++ {
+			y := 95 + 30*int(i)
+			r.ctx.Call("fillText", fmt.Sprintf("%d", s.inventory[i]), 30, y)
+			r.ctx.Call("drawImage", image(itemSprite[i]), 0, y-30, 30, 30)
+		}
 	}
 }
 
@@ -192,12 +202,17 @@ const spritesPerWidth = 9
 
 var cachedImages = map[string]js.Value{}
 
-func (r *render) draw(id string, p vec, sx, sy float64) {
+func image(id string) js.Value {
 	v, ok := cachedImages[id]
 	if !ok {
 		v = js.Global().Get("Image").New()
 		v.Set("src", "sprites/"+id+".svg")
 	}
+	return v
+}
+
+func (r *render) draw(id string, p vec, sx, sy float64) {
+	v := image(id)
 
 	w := sx * r.spriteSize
 	h := sy * r.spriteSize
@@ -214,6 +229,8 @@ func (r *render) onscreen(min, max float64) bool {
 
 type state struct {
 	ship         transform
+	inventory    [numItems]int
+	collecting   [numItems][]transform
 	viewx, viewy float64
 	keyDown      map[key]bool
 	key          map[key]bool
@@ -293,7 +310,7 @@ func (s *state) step(dt float64) {
 	{ /// Update ship position
 
 		coasting := true
-		const accel = 50
+		const accel = 25
 		if s.key[keyLeft] {
 			s.ship.v[0] -= accel * dt
 			coasting = false
@@ -311,7 +328,7 @@ func (s *state) step(dt float64) {
 			coasting = false
 		}
 
-		clamp(&s.ship.v[1], -10, 10)
+		clamp(&s.ship.v[1], -5, 5)
 		if coasting && math.Abs(s.ship.v[0]) < 2.5 && math.Abs(s.ship.v[1]) < 2.5 {
 			s.ship.v[0] *= math.Pow(0.1, dt)
 			s.ship.v[1] *= math.Pow(0.1, dt)
@@ -336,13 +353,29 @@ func (s *state) step(dt float64) {
 	}
 	// TODO: move items to new bands
 
+	for i := range s.collecting {
+		for j := 0; j < len(s.collecting[i]); j++ {
+			if s.collecting[i][j].p.sub(s.ship.p).abs() < 0.25 {
+				s.inventory[i]++
+				last := len(s.collecting[i]) - 1
+				s.collecting[i][j] = s.collecting[i][last]
+				s.collecting[i] = s.collecting[i][:last]
+				j--
+				continue
+			}
+
+			s.collecting[i][j].v = s.collecting[i][j].v.tween(s.ship.p.sub(s.collecting[i][j].p).norm().scale(10), 10*dt) // .scale(math.Pow(0.9, dt))
+			s.collecting[i][j].applyVelocity(dt)
+		}
+	}
+
 	s.viewy += (s.ship.p[1] - s.viewy) * dt
-	clamp(&s.viewy, s.ship.p[1]-3, s.ship.p[1]+3)
+	clamp(&s.viewy, s.ship.p[1]-1, s.ship.p[1]+1)
 }
 
 const shipSize = 0.5
 
-func (s *state) pushItem(i popItem, t item) {
+func (s *state) pushItem(i transform, t item) {
 	bi := int(i.p[1] / bandHeight)
 	s.bands[bi].i[t].push(i)
 }
@@ -391,6 +424,9 @@ func (b *band) step(dt float64, bandIndex int) {
 		// 	}
 		// }
 
+		shipCollectionMin := s.ship.p.sub(vec{1, 1})
+		shipCollectionMax := s.ship.p.add(vec{1, 1})
+
 	jLoop:
 		for j := 0; j < len(b.i[i].p); j++ {
 			tilePos := b.i[i].p[j].floor()
@@ -428,6 +464,12 @@ func (b *band) step(dt float64, bandIndex int) {
 					j--
 					continue jLoop
 				}
+			case empty:
+				if b.i[i].p[j].within(shipCollectionMin, shipCollectionMax) && (s.inventory[i]+len(s.collecting[i])) < 100 {
+					s.collecting[i] = append(s.collecting[i], b.i[i].pop(j))
+					j--
+					continue jLoop
+				}
 			}
 
 			b.i[i].p[j][0] += b.i[i].v[j][0] * dt
@@ -451,13 +493,8 @@ func (s *state) tileAt(v vec) tile {
 	return s.tiles[xTile][yTile]
 }
 
-type popItem struct {
-	p vec
-	v vec
-}
-
-func (is *items) pop(i int) popItem {
-	pi := popItem{
+func (is *items) pop(i int) transform {
+	pi := transform{
 		p: is.p[i],
 		v: is.v[i],
 	}
@@ -471,7 +508,7 @@ func (is *items) pop(i int) popItem {
 	return pi
 }
 
-func (is *items) push(pi popItem) {
+func (is *items) push(pi transform) {
 	is.p = append(is.p, pi.p)
 	is.v = append(is.v, pi.v)
 }
@@ -498,7 +535,7 @@ func (rb *rockband) step(dt float64) {
 	rb.nextSpawn += dt
 	// fmt.Println(len(rb.t))
 	for ; rb.nextSpawn > 0; rb.nextSpawn -= 0.25 {
-		pi := popItem{
+		pi := transform{
 			p: vec{
 				-1,
 				rb.height*rand.Float64() + rb.topY,
