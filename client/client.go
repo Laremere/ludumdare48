@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"math/rand"
 	"syscall/js"
 )
 
@@ -20,11 +21,7 @@ const (
 
 func main() {
 	fmt.Println("Starting game")
-	s = &state{
-		keyDown: make(map[key]bool),
-		key:     make(map[key]bool),
-		keyUp:   make(map[key]bool),
-	}
+	s = newState()
 	r := NewRender()
 	r.render()
 
@@ -95,6 +92,9 @@ type render struct {
 	spriteSize float64
 	halfWidth  float64
 	halfHeight float64
+
+	viewTop    float64
+	viewBottom float64
 }
 
 func NewRender() *render {
@@ -129,16 +129,21 @@ func (r *render) render() {
 			r.halfHeight = float64(height) / 2
 		}
 	}
+	r.viewTop = s.viewy - r.halfHeight/r.spriteSize
+	r.viewBottom = s.viewy + r.halfHeight/r.spriteSize
 
 	r.ctx.Set("fillStyle", "#000000")
 	r.ctx.Call("fillRect", 0, 0, r.width, r.height)
 
 	r.draw("ship", s.ship.p, 1, 1)
 
-	for i := -100; i < 100; i++ {
-		r.draw("rock", [2]float64{0, float64(i) * 4}, 0.2, 0.2)
+	for _, rb := range s.rocks {
+		if r.onscreen(rb.topY, rb.topY+rb.height) {
+			for _, t := range rb.t {
+				r.draw("rock", t.p, 0.2, 0.2)
+			}
+		}
 	}
-
 }
 
 const spritesPerWidth = 16
@@ -161,12 +166,46 @@ func (r *render) draw(id string, p [2]float64, sx, sy float64) {
 	r.ctx.Call("drawImage", v, xx, yy, w, h)
 }
 
+func (r *render) onscreen(min, max float64) bool {
+	return !(r.viewBottom < min || r.viewTop > max)
+}
+
 type state struct {
 	ship         transform
 	viewx, viewy float64
 	keyDown      map[key]bool
 	key          map[key]bool
 	keyUp        map[key]bool
+	rocks        []*rockband
+}
+
+func newState() *state {
+	s := &state{
+		keyDown: make(map[key]bool),
+		key:     make(map[key]bool),
+		keyUp:   make(map[key]bool),
+		rocks: []*rockband{
+			&rockband{
+				topY:   0,
+				height: 20,
+			},
+			&rockband{
+				topY:   25,
+				height: 20,
+			},
+			&rockband{
+				topY:   45,
+				height: 20,
+			},
+		},
+	}
+
+	for _, rb := range s.rocks {
+		speed := math.Sqrt(1/float64(worldHeight)) * 10
+		rb.step(spritesPerWidth / speed)
+	}
+
+	return s
 }
 
 func (s *state) step(dt float64) {
@@ -193,7 +232,6 @@ func (s *state) step(dt float64) {
 
 		clamp(&s.ship.v[1], -10, 10)
 		if coasting && math.Abs(s.ship.v[0]) < 2.5 && math.Abs(s.ship.v[1]) < 2.5 {
-			fmt.Println(math.Pow(0.5, dt))
 			s.ship.v[0] *= math.Pow(0.1, dt)
 			s.ship.v[1] *= math.Pow(0.1, dt)
 		}
@@ -205,12 +243,48 @@ func (s *state) step(dt float64) {
 		s.ship.applyVelocity(dt)
 
 		clampAndReset(&s.ship.p[0], -1*spritesPerWidth/2+0.5, spritesPerWidth/2-0.5, &s.ship.v[0])
-		clampAndReset(&s.ship.p[1], -100, 5, &s.ship.v[1])
+		clampAndReset(&s.ship.p[1], -5, worldHeight, &s.ship.v[1])
+	}
+
+	for _, rb := range s.rocks {
+		rb.step(dt)
 	}
 
 	s.viewy += (s.ship.p[1] - s.viewy) * dt
 	clamp(&s.viewy, s.ship.p[1]-3, s.ship.p[1]+3)
 }
+
+type rockband struct {
+	nextSpawn float64
+	t         []transform
+	size      []float64
+	topY      float64
+	height    float64
+}
+
+func (rb *rockband) step(dt float64) {
+	for i := 0; i < len(rb.t); i++ {
+		rb.t[i].applyVelocity(dt)
+		if rb.t[i].p[0] > spritesPerWidth/2+0.5 {
+			last := len(rb.t) - 1
+			rb.t[i] = rb.t[last]
+			rb.t = rb.t[:last]
+		}
+	}
+
+	rb.nextSpawn += dt
+	fmt.Println(len(rb.t))
+	for ; rb.nextSpawn > 0; rb.nextSpawn -= 0.5 {
+		i := len(rb.t)
+		rb.t = append(rb.t, transform{})
+		rb.t[i].p[0] = -1*spritesPerWidth/2 - 0.5
+		rb.t[i].p[1] = rb.height*rand.Float64() + rb.topY
+		rb.t[i].v[0] = math.Sqrt(1/(worldHeight-rb.t[i].p[1])) * 10
+		rb.t[i].applyVelocity(rb.nextSpawn)
+	}
+}
+
+const worldHeight = 1000
 
 type transform struct {
 	p [2]float64
