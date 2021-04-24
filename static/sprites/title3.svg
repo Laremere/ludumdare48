@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg viewBox="104.801 57.443 506.547 214.162" width="506.547" height="214.162" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient gradientUnits="userSpaceOnUse" cx="248.413" cy="232.104" r="224.819" id="gradient-1" gradientTransform="matrix(0.001033, 0.357452, -1.021873, 0.002954, 596.990986, 75.76209)">
+      <stop offset="0" style="stop-color: rgb(216, 216, 216); stop-opacity: 0;"/>
+      <stop offset="0.531" style="stop-opacity: 0; stop-color: rgb(164, 136, 53);"/>
+      <stop offset="0.558" style="stop-color: rgb(164, 136, 53);"/>
+      <stop offset="0.652" style="stop-color: rgb(185, 157, 74);"/>
+      <stop offset="0.697" style="stop-color: rgb(227, 200, 117);"/>
+      <stop offset="0.769" style="stop-color: rgb(227, 200, 117);"/>
+      <stop offset="0.82" style="stop-color: rgb(227, 200, 117); stop-opacity: 0;"/>
+      <stop offset="0.854" style="stop-color: rgb(227, 200, 117);"/>
+      <stop offset="1" style="stop-color: rgb(164, 136, 53);"/>
+    </radialGradient>
+    <mask id="mask-0">
+      <rect x="125.119" y="37.64" width="479.531" height="120.223" style="fill: rgb(255, 255, 255);"/>
+    </mask>
+    <radialGradient gradientUnits="userSpaceOnUse" cx="160.304" cy="183.918" r="93.615" id="gradient-0" gradientTransform="matrix(0.004924, 2.154501, -3.160917, 0.007223, 831.240479, -213.080566)">
+      <stop offset="0" style="stop-color: rgb(72, 75, 20);"/>
+      <stop offset="0.204" style="stop-color: rgb(164, 136, 53);"/>
+      <stop offset="0.454" style="stop-color: rgb(227, 200, 117);"/>
+      <stop offset="0.715" style="stop-color: rgb(164, 121, 53);"/>
+      <stop offset="1" style="stop-color: rgb(164, 136, 53);"/>
+    </radialGradient>
+    <radialGradient gradientUnits="userSpaceOnUse" cx="216.539" cy="184.313" r="93.615" id="gradient-4" gradientTransform="matrix(-1.099308, -0.000208, 0.002157, -0.97455, 496.643158, 409.041656)">
+      <stop offset="0.005" style="stop-color: rgba(0, 0, 0, 0);"/>
+      <stop offset="0.794" style="stop-color: rgba(0, 0, 0, 0);"/>
+      <stop offset="0.932" style="stop-color: rgba(0, 0, 0, 0.37);"/>
+      <stop offset="1" style="stop-color: rgba(0, 0, 0, 0.49);"/>
+    </radialGradient>
+    <radialGradient gradientUnits="userSpaceOnUse" cx="248.413" cy="232.104" r="224.819" id="gradient-3" gradientTransform="matrix(0.001033, 0.357452, -1.021873, 0.002954, 597.066248, 75.89479)">
+      <stop offset="0" style="stop-color: rgb(216, 216, 216); stop-opacity: 0;"/>
+      <stop offset="0.531" style="stop-opacity: 0; stop-color: rgb(164, 136, 53);"/>
+      <stop offset="0.558" style="stop-color: rgb(164, 136, 53);"/>
+      <stop offset="0.652" style="stop-color: rgb(185, 157, 74);"/>
+      <stop offset="0.697" style="stop-color: rgb(227, 200, 117);"/>
+      <stop offset="0.769" style="stop-color: rgb(227, 200, 117);"/>
+      <stop offset="0.82" style="stop-color: rgb(227, 200, 117); stop-opacity: 0;"/>
+      <stop offset="0.854" style="stop-color: rgb(227, 200, 117);"/>
+      <stop offset="1" style="stop-color: rgb(164, 136, 53);"/>
+    </radialGradient>
+    <mask id="mask-1">
+      <rect x="120.001" y="157.879" width="479.531" height="120.223" style="fill: rgb(255, 255, 255);"/>
+    </mask>
+  </defs>
+  <rect x="-6.122" y="-7.292" width="523.443" height="524.051" style="" transform="matrix(0.999997, 0.002443, -0.002443, 0.999997, 103.181618, -79.073189)"/>
+  <ellipse style="fill: url(#gradient-1); mask: url(#mask-0);" cx="360.068" cy="165.244" rx="229.506" ry="80.388" transform="matrix(0.999968, 0.008054, -0.008054, 0.999968, 1.086693, -8.166719)"/>
+  <rect x="179.219" y="28.235" width="149.495" height="225.885" style="" transform="matrix(0.840659, -0.541564, 0.541564, 0.840659, 23.283739, 111.214813)"/>
+  <g transform="matrix(1.020816, 0.008222, -0.008222, 1.020816, 108.135818, -79.006294)" style="">
+    <circle style="paint-order: fill; stroke-width: 0px; fill: url(#gradient-0);" cx="249.319" cy="230.717" r="93.615"/>
+    <circle style="paint-order: fill; stroke-width: 0px; fill: url(#gradient-4);" cx="249.088" cy="230.555" r="94.565" transform="matrix(0.999999, 0.001012, 0, 0.999999, 0.000225, -0.251929)"/>
+  </g>
+  <ellipse style="fill: url(#gradient-3); mask: url(#mask-1);" cx="360.143" cy="165.377" rx="229.506" ry="80.388" transform="matrix(0.999968, 0.008054, -0.008054, 0.999968, 1.088234, -8.163933)"/>
+  <text transform="matrix(0.999968, 0.008054, -0.008054, 0.999968, -26.392738, -11.672413)" style="fill: rgb(0, 255, 255); font-family: &quot;'Courier New', monospace&quot;; font-size: 55.7px; font-weight: 700; stroke: rgb(0, 0, 0); white-space: pre; text-decoration: underline solid rgba(255, 255, 255, 0.9);" x="169.035" y="181.798">The Saturn Signal</text>
+</svg>
