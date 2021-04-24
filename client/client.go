@@ -154,26 +154,18 @@ func (r *render) render() {
 		}
 	}
 
-	for _, b := range s.bands {
-		for itemName, i := range b.i {
-			for _, pos := range i.p {
-				r.draw(itemSprite[item(itemName)], pos, 0.1, 0.1)
-			}
-		}
-	}
-
-	// for _, rb := range s.rocks {
-	// 	if r.onscreen(rb.topY, rb.topY+rb.height) {
-	// 		for _, t := range rb.t {
-	// 			r.draw("rock", t.p, 0.2, 0.2)
-	// 		}
-	// 	}
-	// }
-
 	for x := 0; x < len(s.tiles); x++ {
 		for y := tileTop; y < tileBottom; y++ {
 			if s.tiles[x][y] != empty {
 				r.draw(tileSprite[s.tiles[x][y]], vec{(float64(x) + 0.5), float64(y) + 0.5}, 1, 1)
+			}
+		}
+	}
+
+	for _, b := range s.bands {
+		for itemName, i := range b.i {
+			for _, pos := range i.p {
+				r.draw(itemSprite[item(itemName)], pos, 0.1, 0.1)
 			}
 		}
 	}
@@ -282,7 +274,7 @@ func init() {
 	}
 
 	for _, rb := range s.rocks {
-		speed := math.Sqrt(1/float64(worldHeight)) * 10
+		speed := math.Sqrt(1/float64(worldHeight)) * 5
 		rb.step(spritesPerWidth / speed)
 	}
 	for x := 0; x < spritesPerWidth-1; x++ {
@@ -387,28 +379,55 @@ type items struct {
 
 func (b *band) step(dt float64, bandIndex int) {
 	for i := range b.i {
-		if item(i) == rock {
-			for j := 0; j < len(b.i[i].p); j++ {
-				if s.tileAt(b.i[i].p[j]) == forge {
+		// if item(i) == rock {
+		// 	for j := 0; j < len(b.i[i].p); j++ {
+		// 		if s.tileAt(b.i[i].p[j]) == forge {
+		// 			tilepos := b.i[i].p[j].floor()
+
+		// 		}
+		// 		// } else if s.tileAt(b.i[i].p[j].add(vec{2, 0})) == forge {
+		// 		// 	b.i[i].v[j] = vec{2, 0}
+		// 		// }
+		// 	}
+		// }
+
+	jLoop:
+		for j := 0; j < len(b.i[i].p); j++ {
+			tilePos := b.i[i].p[j].floor()
+			refTile := b.i[i].p[j].sub(tilePos)
+
+			switch s.tileAt(b.i[i].p[j]) {
+			case redirectorDown, redirectorUp, redirectorRight, redirectorLeft:
+				var dir vec
+				switch s.tileAt(b.i[i].p[j]) {
+				case redirectorUp:
+					dir = vec{0, -1}
+				case redirectorDown:
+					dir = vec{0, 1}
+				case redirectorRight:
+					dir = vec{1, 0}
+				case redirectorLeft:
+					dir = vec{-1, 0}
+				}
+				if b.i[i].v[j][0] != dir[0] || b.i[i].v[j][1] != dir[1] {
+					if refTile.within(vec{0.4, 0.4}, vec{0.6, 0.6}) {
+						b.i[i].v[j] = dir
+						b.i[i].p[j] = tilePos.add(vec{rand.Float64()*0.2 + 0.4, rand.Float64()*0.2 + 0.4})
+					} else {
+						b.i[i].v[j] = b.i[i].v[j].tween(tilePos.add(vec{0.5, 0.5}).sub(b.i[i].p[j]).norm(), 0.5*dt)
+					}
+				}
+			case forge:
+				if !refTile.within(vec{-1, 0.35}, vec{2, 0.65}) {
+					b.i[i].pop(j)
+					j--
+					continue jLoop
+				}
+				if item(i) == rock && refTile.within(vec{0.35, 0.35}, vec{0.65, 0.65}) {
 					b.i[metal].push(b.i[i].pop(j))
 					j--
+					continue jLoop
 				}
-				// } else if s.tileAt(b.i[i].p[j].add(vec{2, 0})) == forge {
-				// 	b.i[i].v[j] = vec{2, 0}
-				// }
-			}
-		}
-
-		for j := 0; j < len(b.i[i].p); j++ {
-			switch s.tileAt(b.i[i].p[j]) {
-			case redirectorUp:
-				b.i[i].v[j] = b.i[i].v[j].tween(vec{0, -2}, dt)
-			case redirectorDown:
-				b.i[i].v[j] = b.i[i].v[j].tween(vec{0, 2}, dt)
-			case redirectorRight:
-				b.i[i].v[j] = b.i[i].v[j].tween(vec{2, 0}, dt)
-			case redirectorLeft:
-				b.i[i].v[j] = b.i[i].v[j].tween(vec{-2, 0}, dt)
 			}
 
 			b.i[i].p[j][0] += b.i[i].v[j][0] * dt
@@ -489,7 +508,7 @@ func (rb *rockband) step(dt float64) {
 			// 	0,
 			// },
 		}
-		pi.v[0] = math.Sqrt(1/(worldHeight-pi.p[1])) * 10
+		pi.v[0] = math.Sqrt(1/(worldHeight-pi.p[1])) * 5
 		pi.p[0] += pi.v[0] * rb.nextSpawn
 		s.pushItem(pi, rock)
 
@@ -570,4 +589,12 @@ func (v vec) tween(dst vec, dt float64) vec {
 		return dst
 	}
 	return v.add(dir.scale(dt / dirlen))
+}
+
+func (v vec) floor() vec {
+	return vec{math.Floor(v[0]), math.Floor(v[1])}
+}
+
+func (v vec) within(min, max vec) bool {
+	return v[0] >= min[0] && v[0] <= max[0] && v[1] >= min[1] && v[1] <= max[1]
 }
