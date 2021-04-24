@@ -66,6 +66,9 @@ func (c *client) animationFrame(this js.Value, args []js.Value) interface{} {
 	timestamp := args[0].Float()
 	if c.lasttimestamp != 0 {
 		dt := (timestamp - c.lasttimestamp) / 1000
+		if dt > 1.0/20 {
+			dt = 1.0 / 20
+		}
 		s.step(dt)
 
 		for k := range s.keyDown {
@@ -134,27 +137,27 @@ func (r *render) render() {
 	r.ctx.Set("fillStyle", "#000000")
 	r.ctx.Call("fillRect", 0, 0, r.width, r.height)
 
-	r.draw("station", [2]float64{0, -6}, 10, 10)
+	r.draw("station", vec{spritesPerWidth / 2, -3}, 5, 5)
 
-	tileTop := int(r.viewTop / 2)
+	tileTop := int(r.viewTop)
 	if tileTop < 0 {
 		tileTop = 0
 	}
-	tileBottom := int(r.viewBottom / 2)
+	tileBottom := int(r.viewBottom)
 	if tileBottom >= len(s.tiles[0]) {
 		tileBottom = len(s.tiles[0]) - 1
 	}
 
 	for y := tileTop; y < tileBottom; y++ {
 		if y < s.scaffoldings {
-			r.draw("scaffolding", [2]float64{0, 2 * float64(y)}, 2, 2)
+			r.draw("scaffolding", vec{spritesPerWidth / 2, float64(y)}, 1, 1)
 		}
 	}
 
 	for _, b := range s.bands {
 		for itemName, i := range b.i {
 			for _, pos := range i.p {
-				r.draw(itemSprite[item(itemName)], pos, 0.2, 0.2)
+				r.draw(itemSprite[item(itemName)], pos, 0.1, 0.1)
 			}
 		}
 	}
@@ -170,12 +173,12 @@ func (r *render) render() {
 	for x := 0; x < len(s.tiles); x++ {
 		for y := tileTop; y < tileBottom; y++ {
 			if s.tiles[x][y] != empty {
-				r.draw(tileSprite[s.tiles[x][y]], [2]float64{(2*float64(x) - spritesPerWidth/2 + 2), 2 * float64(y)}, 2, 2)
+				r.draw(tileSprite[s.tiles[x][y]], vec{(float64(x) + 0.5), float64(y) + 0.5}, 1, 1)
 			}
 		}
 	}
 
-	r.draw("ship", s.ship.p, 1, 1) // ALWAYS DRAW LAST
+	r.draw("ship", s.ship.p, shipSize, shipSize) // ALWAYS DRAW LAST
 
 	{
 		totalItems := 0
@@ -188,14 +191,16 @@ func (r *render) render() {
 		r.ctx.Set("font", "30px Arial")
 		r.ctx.Set("textAlign", "30px Arial")
 		r.ctx.Call("fillText", fmt.Sprintf("Total items: %v", totalItems), 0, 30)
+		r.ctx.Call("fillText", fmt.Sprintf("X: %0.2f, Y: %0.2f", s.ship.p[0], s.ship.p[1]), 0, 60)
 	}
 }
 
-const spritesPerWidth = 16
+// const spritesPerWidth = 16
+const spritesPerWidth = 9
 
 var cachedImages = map[string]js.Value{}
 
-func (r *render) draw(id string, p [2]float64, sx, sy float64) {
+func (r *render) draw(id string, p vec, sx, sy float64) {
 	v, ok := cachedImages[id]
 	if !ok {
 		v = js.Global().Get("Image").New()
@@ -222,7 +227,7 @@ type state struct {
 	key          map[key]bool
 	keyUp        map[key]bool
 	rocks        []*rockband
-	tiles        [spritesPerWidth/2 - 1][worldHeight / 2]tile
+	tiles        [spritesPerWidth - 1][worldHeight / 2]tile
 	scaffoldings int
 	bands        [numBands]*band
 }
@@ -248,21 +253,25 @@ var tileSprite = map[tile]string{
 
 func init() {
 	s = &state{
+		ship: transform{
+			p: vec{spritesPerWidth / 2.0, 0.5},
+		},
+		viewx:   spritesPerWidth/2.0 - 0.5,
 		keyDown: make(map[key]bool),
 		key:     make(map[key]bool),
 		keyUp:   make(map[key]bool),
 		rocks: []*rockband{
 			&rockband{
 				topY:   0,
-				height: 20,
+				height: 10,
 			},
 			&rockband{
-				topY:   25,
-				height: 20,
+				topY:   11,
+				height: 10,
 			},
 			&rockband{
-				topY:   45,
-				height: 20,
+				topY:   21,
+				height: 10,
 			},
 		},
 		scaffoldings: 2,
@@ -276,10 +285,16 @@ func init() {
 		speed := math.Sqrt(1/float64(worldHeight)) * 10
 		rb.step(spritesPerWidth / speed)
 	}
+	for x := 0; x < spritesPerWidth-1; x++ {
+		s.tiles[x][0] = forge
+	}
 
-	s.tiles[spritesPerWidth/4][1] = forge
-	s.tiles[spritesPerWidth/4][3] = forge
-	s.tiles[spritesPerWidth/4][5] = forge
+	s.tiles[spritesPerWidth/2][1] = forge
+	s.tiles[spritesPerWidth/2][3] = forge
+	s.tiles[spritesPerWidth/2][5] = forge
+	s.tiles[spritesPerWidth/2-2][1] = redirectorRight
+	s.tiles[spritesPerWidth/2-2][2] = redirectorUp
+	s.tiles[spritesPerWidth/2-2][4] = redirectorUp
 }
 
 func (s *state) step(dt float64) {
@@ -316,7 +331,7 @@ func (s *state) step(dt float64) {
 
 		s.ship.applyVelocity(dt)
 
-		clampAndReset(&s.ship.p[0], -1*spritesPerWidth/2+0.5, spritesPerWidth/2-0.5, &s.ship.v[0])
+		clampAndReset(&s.ship.p[0], -0.5+shipSize/2, spritesPerWidth-0.5-shipSize/2, &s.ship.v[0])
 		clampAndReset(&s.ship.p[1], -5, worldHeight, &s.ship.v[1])
 	}
 
@@ -332,6 +347,8 @@ func (s *state) step(dt float64) {
 	s.viewy += (s.ship.p[1] - s.viewy) * dt
 	clamp(&s.viewy, s.ship.p[1]-3, s.ship.p[1]+3)
 }
+
+const shipSize = 0.5
 
 func (s *state) pushItem(i popItem, t item) {
 	bi := int(i.p[1] / bandHeight)
@@ -364,41 +381,51 @@ type band struct {
 }
 
 type items struct {
-	p [][2]float64
-	v [][2]float64
+	p []vec
+	v []vec
 }
 
 func (b *band) step(dt float64, bandIndex int) {
 	for i := range b.i {
 		if item(i) == rock {
 			for j := 0; j < len(b.i[i].p); j++ {
-				if b.i[i].tileOf(j, bandIndex) == forge {
+				if s.tileAt(b.i[i].p[j]) == forge {
 					b.i[metal].push(b.i[i].pop(j))
+					j--
 				}
+				// } else if s.tileAt(b.i[i].p[j].add(vec{2, 0})) == forge {
+				// 	b.i[i].v[j] = vec{2, 0}
+				// }
 			}
 		}
 
 		for j := 0; j < len(b.i[i].p); j++ {
-			// fmt.Println(items.v[j][0] * dt)
+			switch s.tileAt(b.i[i].p[j]) {
+			case redirectorUp:
+				b.i[i].v[j] = b.i[i].v[j].tween(vec{0, -2}, dt)
+			case redirectorDown:
+				b.i[i].v[j] = b.i[i].v[j].tween(vec{0, 2}, dt)
+			case redirectorRight:
+				b.i[i].v[j] = b.i[i].v[j].tween(vec{2, 0}, dt)
+			case redirectorLeft:
+				b.i[i].v[j] = b.i[i].v[j].tween(vec{-2, 0}, dt)
+			}
+
 			b.i[i].p[j][0] += b.i[i].v[j][0] * dt
 			b.i[i].p[j][1] += b.i[i].v[j][1] * dt
 
-			if b.i[i].p[j][0] < -1*spritesPerWidth/2-2 {
+			if b.i[i].p[j][0] < -1.5 || b.i[i].p[j][0] > spritesPerWidth+0.5 || b.i[i].p[j][1] < -30 || b.i[i].p[j][1] > worldHeight+30 {
 				b.i[i].pop(j)
 				j--
-				// fmt.Println("leftoff")
-			} else if b.i[i].p[j][0] > spritesPerWidth/2+2 {
-				b.i[i].pop(j)
-				j--
-				// fmt.Println("rightoff")
 			}
 		}
 	}
 }
 
-func (is *items) tileOf(i int, bandIndex int) tile {
-	xTile := int((is.p[i][0] - 1 + spritesPerWidth/2) / 2)
-	yTile := int((is.p[i][1] + 1) / 2)
+func (s *state) tileAt(v vec) tile {
+	// vTile := v.TilePos()
+	xTile := int(v[0])
+	yTile := int(v[1])
 	if xTile < 0 || yTile < 0 || xTile >= len(s.tiles) || yTile >= len(s.tiles[0]) {
 		return empty
 	}
@@ -406,8 +433,8 @@ func (is *items) tileOf(i int, bandIndex int) tile {
 }
 
 type popItem struct {
-	p [2]float64
-	v [2]float64
+	p vec
+	v vec
 }
 
 func (is *items) pop(i int) popItem {
@@ -451,13 +478,13 @@ func (rb *rockband) step(dt float64) {
 
 	rb.nextSpawn += dt
 	// fmt.Println(len(rb.t))
-	for ; rb.nextSpawn > 0; rb.nextSpawn -= 0.5 {
+	for ; rb.nextSpawn > 0; rb.nextSpawn -= 0.25 {
 		pi := popItem{
-			p: [2]float64{
-				-1*spritesPerWidth/2 - 0.5,
+			p: vec{
+				-1,
 				rb.height*rand.Float64() + rb.topY,
 			},
-			// v: [2]float64{
+			// v: vec{
 			// 	math.Sqrt(1/(worldHeight-rb.t[i].p[1])) * 10,
 			// 	0,
 			// },
@@ -480,8 +507,8 @@ const worldHeight = 100
 // const worldHeight = 1000
 
 type transform struct {
-	p [2]float64
-	v [2]float64
+	p vec
+	v vec
 }
 
 func (t *transform) applyVelocity(dt float64) {
@@ -505,4 +532,42 @@ func clampAndReset(value *float64, min, max float64, reset *float64) {
 		*value = max
 		*reset = 0
 	}
+}
+
+type vec [2]float64
+
+func (v vec) add(o vec) vec {
+	return vec{
+		v[0] + o[0],
+		v[1] + o[1],
+	}
+}
+
+func (v vec) sub(o vec) vec {
+	return vec{
+		v[0] - o[0],
+		v[1] - o[1],
+	}
+}
+
+func (v vec) scale(m float64) vec {
+	return vec{v[0] * m, v[1] * m}
+}
+
+func (v vec) norm() vec {
+	d := v.abs()
+	return vec{v[0] / d, v[1] / d}
+}
+
+func (v vec) abs() float64 {
+	return math.Sqrt(v[0]*v[0] + v[1]*v[1])
+}
+
+func (v vec) tween(dst vec, dt float64) vec {
+	dir := dst.sub(v)
+	dirlen := dir.abs()
+	if dirlen < dt {
+		return dst
+	}
+	return v.add(dir.scale(dt / dirlen))
 }
