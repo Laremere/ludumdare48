@@ -1,7 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
-<svg viewBox="0 0 500 500" width="500" height="500" xmlns="http://www.w3.org/2000/svg" xmlns:bx="https://boxy-svg.com">
-  <rect x="25.822" y="2.63" width="460.547" height="495.173" style="fill: rgb(216, 216, 216);"/>
-  <path d="M 8.048 215.306 H 65.674 L 60.658 200.306 L 93.887 230.306 L 60.658 260.306 L 65.674 245.306 H 8.048 V 215.306 Z" style="fill: rgb(8, 0, 255);" transform="matrix(0.999999, 0.001399, -0.001399, 0.999999, 392.00708, 9.4158)" bx:shape="arrow 8.048 200.306 85.839 60 30 33.229 5.016 1@72183a84"/>
-  <rect x="98.541" y="6.093" width="24.239" height="128.122" style=""/>
-  <rect x="390.278" y="2.63" width="24.239" height="128.122" style=""/>
+<svg viewBox="0 0 500 500" width="500" height="500" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient gradientUnits="userSpaceOnUse" x1="254.851" y1="371.639" x2="254.851" y2="452.11" id="gradient-1" gradientTransform="matrix(0.02039, 0.978208, -0.35252, 0.007033, 365.369354, -235.792647)">
+      <stop offset="0" style="stop-color: rgba(65, 111, 170, 1)"/>
+      <stop offset="1" style="stop-color: rgba(37, 63, 96, 1)"/>
+    </linearGradient>
+    <linearGradient gradientUnits="userSpaceOnUse" x1="254.851" y1="371.639" x2="254.851" y2="452.11" id="gradient-0" gradientTransform="matrix(0.02039, 0.920666, -0.35252, 0.006619, 415.157562, -219.999323)">
+      <stop offset="0" style="stop-color: rgba(65, 111, 170, 1)"/>
+      <stop offset="1" style="stop-color: rgba(37, 63, 96, 1)"/>
+    </linearGradient>
+    <linearGradient gradientUnits="userSpaceOnUse" x1="254.851" y1="371.639" x2="254.851" y2="452.11" id="gradient-3" gradientTransform="matrix(0.02039, 2.654123, -0.35252, 0.019084, 271.582458, -128.473541)">
+      <stop offset="0" style="stop-color: rgba(65, 111, 170, 1)"/>
+      <stop offset="1" style="stop-color: rgba(37, 63, 96, 1)"/>
+    </linearGradient>
+    <linearGradient gradientUnits="userSpaceOnUse" x1="252.58" y1="138.92" x2="252.58" y2="360.651" id="gradient-4">
+      <stop offset="0" style="stop-color: rgb(59, 59, 59);"/>
+      <stop offset="0.343" style="stop-color: rgb(107, 107, 107);"/>
+      <stop offset="1" style="stop-color: rgb(19, 19, 19);"/>
+    </linearGradient>
+  </defs>
+  <g transform="matrix(1, 0, 0, 1, 1.709145, 0)">
+    <rect y="-130" width="125" height="125" style="fill: rgb(216, 216, 216);"/>
+    <rect y="-130" width="125" height="125" style="fill: rgb(216, 216, 216);" x="375"/>
+    <rect width="125" height="125" style="fill: rgb(216, 216, 216);" x="505"/>
+    <rect width="125" height="125" style="fill: rgb(216, 216, 216);" x="-130"/>
+    <rect width="125" height="125" style="fill: rgb(216, 216, 216);" x="-130" y="375"/>
+    <rect width="125" height="125" style="fill: rgb(216, 216, 216);" y="505"/>
+    <rect y="505" width="125" height="125" style="fill: rgb(216, 216, 216);" x="375"/>
+    <rect width="125" height="125" style="fill: rgb(216, 216, 216);" x="505" y="375"/>
+  </g>
+  <rect x="209.74" y="-26.364" width="30.683" height="78.734" style="fill: url(#gradient-1);"/>
+  <rect x="259.528" y="-22.89" width="30.683" height="74.102" style="fill: url(#gradient-0);"/>
+  <polygon style="stroke: rgb(0, 0, 0); fill: rgb(117, 81, 81);" points="500.073 -0.023 373.734 -0.023 373.734 42.252 207.118 42.252 189.088 24.222 189.088 -0.027 51.95 -0.027 0.409 51.514 0.409 378.02 50.552 499.075 465.344 499.075 498.141 466.278 498.141 352.418 466.479 352.418 466.479 126.172 500.079 126.172"/>
+  <path d="M 115.953 439.757 C 115.931 439.757 116.294 425.157 130.093 424.739 C 144.764 424.295 146.636 439.757 146.636 439.757 L 146.636 546.57 L 146.636 653.382 C 146.636 653.382 142.732 668.348 131.295 668.4 C 119.936 668.451 115.37 653.382 115.953 653.382 L 115.953 546.57 L 115.953 439.757 Z" style="fill: url(#gradient-3);" transform="matrix(0, -1, 1, 0, -299.199982, 380.790833)"/>
+  <rect x="56.612" y="28.634" width="84.524" height="86.261" style="fill: rgb(35, 35, 35);"/>
+  <rect x="182.24" y="138.92" width="140.68" height="221.731" style="fill: url(#gradient-4);"/>
+  <rect x="46.549" y="160.243" width="29.409" height="180.744" style="fill: rgb(35, 35, 35);"/>
+  <rect x="399.916" y="38.47" width="28.122" height="144.372" style="fill: rgb(35, 35, 35);"/>
+  <rect x="418.717" y="38.5" width="40.086" height="68.315" style="fill: rgb(35, 35, 35);"/>
+  <rect x="137.443" y="401.712" width="288.734" height="51.889" style="fill: rgb(35, 35, 35);"/>
 </svg>

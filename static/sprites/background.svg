@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg viewBox="0 0 500 150" width="500" height="150" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient gradientUnits="userSpaceOnUse" x1="250" y1="0" x2="250" y2="150" id="gradient-0">
+      <stop offset="0" style="stop-color: rgb(17, 17, 17);"/>
+      <stop offset="0.266" style="stop-color: rgb(17, 17, 17);"/>
+      <stop offset="0.331" style="stop-color: rgb(61, 46, 12);"/>
+      <stop offset="0.335" style="stop-color: rgb(144, 102, 4);"/>
+      <stop offset="0.409" style="stop-color: rgb(207, 177, 95);"/>
+      <stop offset="0.501" style="stop-color: rgb(154, 149, 90);"/>
+      <stop offset="0.677" style="stop-color: rgb(202, 153, 73);"/>
+      <stop offset="0.815" style="stop-color: rgb(168, 141, 41);"/>
+      <stop offset="1" style="stop-color: rgb(193, 135, 0);"/>
+    </linearGradient>
+  </defs>
+  <rect width="500" height="150" style="fill: url(#gradient-0);"/>
+</svg>

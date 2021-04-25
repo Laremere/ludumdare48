@@ -108,6 +108,8 @@ type render struct {
 
 	viewTop    float64
 	viewBottom float64
+
+	stars [][2]float64
 }
 
 func NewRender() *render {
@@ -147,6 +149,8 @@ func (r *render) render() {
 
 	r.ctx.Set("fillStyle", "#111111")
 	r.ctx.Call("fillRect", 0, 0, r.width, r.height)
+
+	r.draw("background", vec{spritesPerWidth / 2, 150 / 2}, spritesPerWidth, 150)
 
 	r.draw("station", vec{spritesPerWidth / 2, -3}, 5, 5)
 
@@ -225,7 +229,10 @@ func (r *render) render() {
 		r.ctx.Call("fillText", fmt.Sprintf("X: %0.2f, Y: %0.2f", s.ship.p[0], s.ship.p[1]), 0, 60)
 		y := 95
 		for i := item(0); i < numItems; i++ {
-			r.ctx.Call("fillText", fmt.Sprintf("%d", s.inventory[i]), 30, y)
+			if !i.canHold() {
+				continue
+			}
+			r.ctx.Call("fillText", fmt.Sprintf("%d - %d (%d / %d)", s.inventory[i], tileCost[s.buildSelector][i], s.footInv[i], s.scaffoldingCost[i]), 30, y)
 			r.ctx.Call("drawImage", image(itemSprite[i]), 0, y-30, 30, 30)
 			y += 30
 		}
@@ -233,6 +240,8 @@ func (r *render) render() {
 		if s.buildSelector != empty {
 			selected = tileSprite[s.buildSelector]
 		}
+		r.ctx.Call("fillText", fmt.Sprintf("Power %0.1f", s.powerLevel), 30, y)
+		y += 30
 
 		r.ctx.Call("drawImage", image(selected), 0, y, 100, 100)
 	}
@@ -269,26 +278,30 @@ func (r *render) onscreen(min, max float64) bool {
 }
 
 type state struct {
-	ship           transform
-	destination    vec
-	hasDestination bool
-	inventory      [numItems]int
-	collecting     [numItems][]transform
-	sending        []sending
-	viewx, viewy   float64
-	dropCooldown   float64
-	keyDown        map[key]bool
-	key            map[key]bool
-	keyUp          map[key]bool
-	rocks          []*rockband
-	tiles          [spritesPerWidth - 1][worldHeight]tile
-	tileItems      [spritesPerWidth - 1][worldHeight][numItems]int16
-	bands          [numBands]*band
-	scaffoldings   int
-	foot           float64
-	footInv        [numItems]int
-	shipInFootZone bool
-	faders         []fader
+	ship               transform
+	destination        vec
+	hasDestination     bool
+	inventory          [numItems]int
+	collecting         [numItems][]transform
+	sending            []sending
+	viewx, viewy       float64
+	dropCooldown       float64
+	keyDown            map[key]bool
+	key                map[key]bool
+	keyUp              map[key]bool
+	rocks              []*rockband
+	tiles              [spritesPerWidth - 1][worldHeight]tile
+	tileItems          [spritesPerWidth - 1][worldHeight][numItems]int16
+	tileCooldown       [spritesPerWidth - 1][worldHeight]float64
+	bands              [numBands]*band
+	scaffoldings       int
+	foot               float64
+	footSpeed          float64
+	footInv            [numItems]int
+	shipInFootZone     bool
+	faders             []fader
+	heliumRainCooldown float64
+	powerLevel         float64
 
 	buildSelector   tile
 	scaffoldingCost [numItems]int
@@ -299,27 +312,26 @@ type tile int
 const (
 	empty = tile(iota)
 	extractor
-	filter
-	weaver
-	fabricator
-	fan
-	laser
-	core
-	boiler
-	turbine
-
-	forge
 	redirectorUp
 	redirectorLeft
 	redirectorDown
 	redirectorRight
+	weaver
+	fan
 	splitter
+	laser
+	core
+	filter
+	boiler
+	turbine
+	fabricator
 	numTiles
+	// forge
 )
 
 var maxItems = map[tile][numItems]int16{
 	extractor: {
-		ice: 100,
+		ice: 15,
 	},
 	weaver: {
 		carbon: 10,
@@ -332,7 +344,7 @@ var maxItems = map[tile][numItems]int16{
 		hydrogen: 10,
 	},
 	core: {
-		plasma: 10000,
+		plasma: 1000,
 	},
 	boiler: {
 		water: 100,
@@ -353,7 +365,7 @@ var tileSprite = map[tile]string{
 	boiler:     "boiler",
 	turbine:    "turbine",
 
-	forge:           "forge",
+	// forge:           "forge",
 	redirectorUp:    "redirectorUp",
 	redirectorLeft:  "redirectorLeft",
 	redirectorDown:  "redirectordown",
@@ -362,20 +374,73 @@ var tileSprite = map[tile]string{
 }
 
 var tileCost = map[tile]map[item]int{
-	forge: {
-		rock: 40,
+	// forge: {
+	// 	rock: 40,
+	// },
+	extractor: {
+		ice: 20,
 	},
 	redirectorUp: {
-		metal: 25,
+		silicon: 1,
+		carbon:  1,
+		// metal: 25,
 	},
 	redirectorLeft: {
-		metal: 25,
+		silicon: 1,
+		carbon:  1,
+		// metal: 25,
 	},
 	redirectorDown: {
-		metal: 25,
+		silicon: 1,
+		carbon:  1,
+		// metal: 25,
 	},
 	redirectorRight: {
-		metal: 25,
+		silicon: 1,
+		carbon:  1,
+		// metal: 25,
+	},
+	splitter: {
+		hydrogen: 1,
+		silicon:  1,
+		carbon:   1,
+	},
+	filter: {
+		hydrogen: 3,
+		silicon:  5,
+		carbon:   5,
+	},
+	weaver: {
+		silicon: 7,
+		carbon:  6,
+	},
+	fabricator: {
+		nanotubes: 10,
+		helium:    5,
+	},
+	fan: {
+		silicon: 4,
+		carbon:  4,
+	},
+	laser: {
+		hydrogen:  20,
+		carbon:    10,
+		nanotubes: 1,
+	},
+	core: {
+		silicon:   100,
+		hydrogen:  10,
+		nanotubes: 1,
+	},
+	boiler: {
+		hydrogen:  2,
+		carbon:    10,
+		nanotubes: 1,
+	},
+	turbine: {
+		hydrogen:  2,
+		carbon:    10,
+		nanotubes: 1,
 	},
 }
 
@@ -409,14 +474,17 @@ func init() {
 				height: 10,
 			},
 		},
+		footSpeed: 0.5,
 		// scaffoldings: 1,
 		// foot:         1,
 	}
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// cheat, remove
-	for i := item(0); i < numItems; i++ {
-		s.inventory[i] = 9999999
-	}
+	// for i := item(0); i < numItems; i++ {
+	// 	s.inventory[i] = 9999999
+	// }
+	// s.scaffoldings = worldHeight
+	// s.footSpeed = 6
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// cheat, remove
 
 	for i := 0; i < numBands; i++ {
@@ -440,6 +508,10 @@ func init() {
 }
 
 func (s *state) step(dt float64) {
+	s.powerLevel += dt
+	if s.powerLevel > 100 {
+		s.powerLevel = 100
+	}
 	{ /// Update ship position
 
 		coasting := true
@@ -492,7 +564,7 @@ func (s *state) step(dt float64) {
 		s.ship.applyVelocity(dt)
 
 		clampAndReset(&s.ship.p[0], -0.5+shipSize/2, spritesPerWidth-0.5-shipSize/2, &s.ship.v[0])
-		clampAndReset(&s.ship.p[1], -5, worldHeight, &s.ship.v[1])
+		clampAndReset(&s.ship.p[1], -5, 150-shipSize/2, &s.ship.v[1])
 		clampAndReset(&s.ship.p[1], -5, s.foot+3, &s.ship.v[1])
 	}
 
@@ -557,16 +629,16 @@ func (s *state) step(dt float64) {
 		if s.dropCooldown > 0 {
 			s.dropCooldown -= dt
 		}
-		if s.dropCooldown <= 0 && s.tileAt(s.ship.p.add(vec{1, 0})) == forge && s.inventory[rock] > 0 {
+		if s.dropCooldown <= 0 && s.tileAt(s.ship.p.add(vec{1, 0})) == extractor && s.inventory[ice] > 0 {
 			s.sending = append(s.sending, sending{
 				dst: transform{
 					p: s.ship.p.floor().add(vec{1.1, 0.45 + rand.Float64()*0.1}),
 					v: vec{0.5, 0},
 				},
 				p: s.ship.p,
-				i: rock,
+				i: ice,
 			})
-			s.inventory[rock]--
+			s.inventory[ice]--
 			s.dropCooldown += 0.1
 		}
 
@@ -611,6 +683,20 @@ func (s *state) step(dt float64) {
 		b.step(dt, i)
 	}
 
+	{
+		s.heliumRainCooldown += dt
+		if s.heliumRainCooldown > 0 {
+			s.heliumRainCooldown -= 1
+
+			s.pushItem(transform{
+				vec{
+					rand.Float64() * spritesPerWidth,
+					100 + rand.Float64()*25,
+				}, vec{0, 1},
+			}, helium)
+		}
+	}
+
 	for i := 0; i < len(s.faders); i++ {
 		s.faders[i].s -= dt / 10
 		if s.faders[i].s <= 0 {
@@ -623,7 +709,6 @@ func (s *state) step(dt float64) {
 		s.faders[i].t.applyVelocity(dt)
 	}
 
-	// TODO: move items to new bands
 	{
 		// moveUps := 0
 		// moveDowns := 0
@@ -696,17 +781,28 @@ func (s *state) step(dt float64) {
 
 	{
 		if s.foot < float64(s.scaffoldings) {
-			s.foot += dt / 2
+			s.foot += dt * s.footSpeed
 			if s.foot > float64(s.scaffoldings) {
 				s.foot = float64(s.scaffoldings)
 			}
 		} else {
 			s.scaffoldingCost = [numItems]int{}
-			if s.scaffoldings > 3 && s.scaffoldings <= 10 {
-				s.scaffoldingCost[rock] += 5
-			}
-			if s.scaffoldings > 10 {
-				s.scaffoldingCost[metal] += s.scaffoldings
+			if s.scaffoldings < 3 {
+
+			} else if s.scaffoldings < 10 {
+				s.scaffoldingCost[ice] += 5
+			} else if s.scaffoldings < 50 {
+				s.scaffoldingCost[silicon] += s.scaffoldings/20 + 1
+				s.scaffoldingCost[carbon] += s.scaffoldings/20 + 1
+			} else if s.scaffoldings < 60 {
+				s.scaffoldingCost[nanotubes] += 5
+				s.scaffoldingCost[silicon] += 5
+			} else if s.scaffoldings < 120 {
+				s.scaffoldingCost[nanotubes] += 20
+				s.scaffoldingCost[silicon] += 20
+			} else {
+				s.scaffoldingCost[nanotubes] += 20
+				s.scaffoldingCost[computer] += 20
 			}
 			canbuildnext := true
 			for i := range s.scaffoldingCost {
@@ -714,7 +810,7 @@ func (s *state) step(dt float64) {
 					canbuildnext = false
 				}
 			}
-			if canbuildnext {
+			if canbuildnext && s.scaffoldings < 149 {
 				for i := range s.scaffoldingCost {
 					s.footInv[i] -= s.scaffoldingCost[i]
 				}
@@ -723,14 +819,102 @@ func (s *state) step(dt float64) {
 		}
 	}
 
+	{ ////////////////////////////////////
+		for xTile := range s.tiles {
+			for yTile := range s.tiles[xTile] {
+				s.tileCooldown[xTile][yTile] -= dt
+				if s.tileCooldown[xTile][yTile] <= 0 {
+					powerUsage := float64(0)
+					switch s.tiles[xTile][yTile] {
+					case extractor, fan, laser, fabricator:
+						powerUsage = 0.5
+					case weaver:
+						powerUsage = 20
+					}
+					if s.powerLevel < powerUsage {
+						continue
+					}
+
+					// s.tileCooldown[xTile][yTile] = 0
+
+					switch s.tiles[xTile][yTile] {
+					case extractor:
+						if s.tileItems[xTile][yTile][ice] >= 10 {
+							s.pushItem(transform{p: randPosCenterTile(xTile, yTile), v: vec{1, 0}}, carbon)
+							s.pushItem(transform{p: randPosCenterTile(xTile, yTile), v: vec{0, -1}}, silicon)
+							s.tileItems[xTile][yTile][ice] -= 10
+							s.tileCooldown[xTile][yTile] = 3
+							if yTile+1 < worldHeight && s.tiles[xTile][yTile+1] == filter {
+								s.tileItems[xTile][yTile+1][water] = 5
+							}
+							s.powerLevel -= powerUsage
+						}
+					case filter:
+						if s.tileItems[xTile][yTile][water] > 0 {
+							s.pushItem(transform{p: randPosCenterTile(xTile, yTile), v: vec{1, 0}}, water)
+							s.tileItems[xTile][yTile][water]--
+							s.tileCooldown[xTile][yTile] = 0.15
+							s.powerLevel -= powerUsage
+						}
+					case weaver:
+						if s.tileItems[xTile][yTile][carbon] >= 1 {
+							s.pushItem(transform{p: randPosCenterTile(xTile, yTile), v: vec{1, 0}}, nanotubes)
+							s.tileItems[xTile][yTile][carbon] -= 1
+							s.tileCooldown[xTile][yTile] = 0.5
+							s.powerLevel -= powerUsage
+						}
+					case fabricator:
+						if s.tileItems[xTile][yTile][silicon] >= 1 && s.tileItems[xTile][yTile][helium] >= 1 {
+							s.pushItem(transform{p: randPosCenterTile(xTile, yTile), v: vec{1, 0}}, computer)
+							s.tileItems[xTile][yTile][carbon] -= 1
+							s.tileItems[xTile][yTile][helium] -= 1
+							s.tileCooldown[xTile][yTile] = 0.5
+							s.powerLevel -= powerUsage
+						}
+					case fan:
+						if yTile >= 50 {
+							s.pushItem(transform{p: randPosCenterTile(xTile, yTile), v: vec{0, 1}}, hydrogen)
+							s.tileCooldown[xTile][yTile] = 10
+							s.powerLevel -= powerUsage
+						}
+					case laser:
+						if s.tileItems[xTile][yTile][hydrogen] >= 1 {
+							s.pushItem(transform{p: randPosCenterTile(xTile, yTile), v: vec{0, -1}}, plasma)
+							s.tileCooldown[xTile][yTile] = 1
+							s.tileItems[xTile][yTile][hydrogen] -= 1
+							s.powerLevel -= powerUsage
+						}
+					case core:
+						for s.tileCooldown[xTile][yTile] <= 0 {
+							s.tileCooldown[xTile][yTile] += 0.05
+							if rand.Intn(1000) < int(s.tileItems[xTile][yTile][plasma]) {
+								speed := 1 + float64(s.tileItems[xTile][yTile][plasma])/1000
+								angle := rand.Float64() * math.Pi * 2
+								s.pushItem(transform{p: randPosCenterTile(xTile, yTile), v: vec{speed * math.Cos(angle), speed * math.Sin(angle)}}, plasma)
+								s.tileItems[xTile][yTile][plasma] -= 1
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
 	s.viewy += (s.ship.p[1] - s.viewy) * dt
 	clamp(&s.viewy, s.ship.p[1]-1, s.ship.p[1]+1)
+}
+
+func randPosCenterTile(xTile, yTile int) vec {
+	return vec{float64(xTile) + rand.Float64()*0.2 + 0.4, float64(yTile) + rand.Float64()*0.2 + 0.4}
 }
 
 const shipSize = 0.5
 
 func (s *state) pushItem(i transform, t item) {
 	bi := int(math.Floor(i.p[1] / bandHeight))
+	if bi >= len(s.bands) {
+		bi = len(s.bands) - 1
+	}
 	s.bands[bi].i[t].push(i)
 }
 
@@ -761,9 +945,9 @@ type rockband struct {
 type item byte
 
 const (
-	rock = item(iota)
-	metal
-	ice
+	// rock
+	// metal
+	ice = item(iota)
 	carbon
 	silicon
 	nanotubes
@@ -777,9 +961,16 @@ const (
 	numItems
 )
 
+func (i item) canHold() bool {
+	if i == water || i == steam || i == plasma {
+		return false
+	}
+	return true
+}
+
 var itemSprite = map[item]string{
-	rock:      "rock",
-	metal:     "metal",
+	// rock:      "rock",
+	// metal:     "metal",
 	ice:       "ice",
 	carbon:    "carbon",
 	silicon:   "silicon",
@@ -801,8 +992,29 @@ type items struct {
 	v []vec
 }
 
+func tileLeftSide() (vec, vec) {
+	return vec{0, 0.25}, vec{0.25, 0.75}
+}
+
+func tileRightSide() (vec, vec) {
+	return vec{0.75, 0.25}, vec{1, 0.75}
+}
+
+func tileTopSide() (vec, vec) {
+	return vec{0.25, 0}, vec{0.75, 0.25}
+}
+
+func tileBottomSide() (vec, vec) {
+	return vec{0.25, 0.75}, vec{0.75, 1}
+}
+
+func tileCenter() (vec, vec) {
+	return vec{0.24, 0.24}, vec{0.76, 0.76}
+}
+
 func (b *band) step(dt float64, bandIndex int) {
 	for i := range b.i {
+		ii := item(i)
 		// if item(i) == rock {
 		// 	for j := 0; j < len(b.i[i].p); j++ {
 		// 		if s.tileAt(b.i[i].p[j]) == forge {
@@ -820,10 +1032,18 @@ func (b *band) step(dt float64, bandIndex int) {
 
 	jLoop:
 		for j := 0; j < len(b.i[i].p); j++ {
-			tilePos := b.i[i].p[j].floor()
-			refTile := b.i[i].p[j].sub(tilePos)
 
-			switch s.tileAt(b.i[i].p[j]) {
+			b.i[i].p[j][0] += b.i[i].v[j][0] * dt
+			b.i[i].p[j][1] += b.i[i].v[j][1] * dt
+
+			tilePos := b.i[i].p[j].floor()
+			relTile := b.i[i].p[j].sub(tilePos)
+			xTile, yTile := b.i[i].p[j].tilePos()
+
+			storeInTile := false
+			fade := false
+			tt := s.tileAt(b.i[i].p[j])
+			switch tt {
 			case redirectorDown, redirectorUp, redirectorRight, redirectorLeft:
 				var dir vec
 				switch s.tileAt(b.i[i].p[j]) {
@@ -837,50 +1057,160 @@ func (b *band) step(dt float64, bandIndex int) {
 					dir = vec{-1, 0}
 				}
 				if b.i[i].v[j][0] != dir[0] || b.i[i].v[j][1] != dir[1] {
-					if refTile.within(vec{0.4, 0.4}, vec{0.6, 0.6}) {
+					if relTile.within(vec{0.4, 0.4}, vec{0.6, 0.6}) {
 						b.i[i].v[j] = dir
 						b.i[i].p[j] = tilePos.add(vec{rand.Float64()*0.2 + 0.4, rand.Float64()*0.2 + 0.4})
 					} else {
-						b.i[i].v[j] = b.i[i].v[j].tween(tilePos.add(vec{0.5, 0.5}).sub(b.i[i].p[j]).norm(), 0.5*dt)
+						speed := 0.5
+						if ii == plasma {
+							speed = 3
+						}
+						b.i[i].v[j] = b.i[i].v[j].tween(tilePos.add(vec{0.5, 0.5}).sub(b.i[i].p[j]).norm(), speed*dt)
 					}
 				}
 			// case forge:
-			// 	if !refTile.within(vec{-1, 0.35}, vec{2, 0.65}) {
+			// 	if !relTile.within(vec{-1, 0.35}, vec{2, 0.65}) {
 			// 		s.fader(b.i[i].pop(j), item(i))
 			// 		j--
 			// 		continue jLoop
 			// 	}
-			// 	if item(i) == rock && refTile.within(vec{0.35, 0.35}, vec{0.65, 0.65}) {
+			// 	if item(i) == rock && relTile.within(vec{0.35, 0.35}, vec{0.65, 0.65}) {
 			// 		b.i[metal].push(b.i[i].pop(j))
 			// 		j--
 			// 		continue jLoop
 			// 	}
 			// case extractor, weaver, fabricator, laser:
 			case extractor:
+				if relTile.within(tileLeftSide()) && ii == ice {
+
+				} else if (relTile.within(tileRightSide()) || relTile.within(tileCenter()) || relTile.within(tileTopSide())) && (ii == carbon || ii == silicon) {
+
+				} else if relTile.within(tileCenter()) && ii == ice {
+					storeInTile = true
+				} else {
+					fade = true
+				}
+			case weaver:
+				if relTile.within(tileLeftSide()) && ii == carbon {
+				} else if (relTile.within(tileRightSide()) || relTile.within(tileCenter())) && (ii == nanotubes) {
+				} else if relTile.within(tileCenter()) && ii == carbon {
+					storeInTile = true
+				} else {
+					fade = true
+				}
+
+			case fabricator:
+				if relTile.within(tileLeftSide()) && (ii == silicon || ii == helium) {
+				} else if (relTile.within(tileRightSide()) || relTile.within(tileCenter())) && (ii == computer) {
+				} else if relTile.within(tileCenter()) && (ii == silicon || ii == helium) {
+					storeInTile = true
+				} else {
+					fade = true
+				}
+
+			case fan:
+				if (relTile.within(tileBottomSide()) || relTile.within(tileCenter())) && (ii == hydrogen) {
+				} else {
+					fade = true
+				}
+			case laser:
+				if relTile.within(tileBottomSide()) && ii == hydrogen {
+				} else if (relTile.within(tileTopSide()) || relTile.within(tileCenter())) && (ii == plasma) {
+				} else if relTile.within(tileCenter()) && ii == hydrogen {
+					storeInTile = true
+				} else {
+					fade = true
+				}
+
+			case core:
+				if relTile.within(tileCenter()) && ii == plasma {
+					if b.i[i].v[j].abs() <= 1 {
+						storeInTile = true
+					}
+				} else if relTile.within(tileCenter()) {
+					fade = true
+				}
+
+			case boiler:
+				if relTile.within(tileLeftSide()) && ii == water {
+				} else if relTile.within(tileCenter()) && ii == water {
+					storeInTile = true
+				} else if ii == plasma {
+					if s.tileItems[xTile][yTile][water] > 0 {
+						s.tileItems[xTile][yTile][water]--
+						speed := b.i[i].v[j].abs()
+						s.pushItem(transform{p: randPosCenterTile(xTile, yTile), v: vec{speed, 0}}, steam)
+						b.i[i].pop(j)
+						j--
+						continue jLoop
+					}
+				} else if (relTile.within(tileRightSide()) || relTile.within(tileCenter())) && (ii == steam) {
+				} else {
+					fade = true
+				}
+
+			case splitter:
+				if relTile.within(tileTopSide()) {
+					switch rand.Intn(3) {
+					case 0:
+						b.i[i].v[j] = vec{-1, 0}
+					case 1:
+						b.i[i].v[j] = vec{1, 0}
+					case 2:
+						b.i[i].v[j] = vec{0, 1}
+					}
+					b.i[i].p[j] = tilePos.add(vec{rand.Float64()*0.2 + 0.4, rand.Float64()*0.2 + 0.4})
+				}
+
+			case turbine:
+				if ii == steam && (relTile.within(tileCenter()) || relTile.within(tileLeftSide()) || relTile.within(tileRightSide())) {
+					speed := b.i[i].v[j].abs()
+					if relTile.within(tileCenter()) && speed > 1 {
+						b.i[i].v[j] = b.i[i].v[j].norm()
+						s.powerLevel = 50 * (speed - 1)
+					}
+				} else {
+					fade = true
+				}
 
 			case empty:
-				if b.i[i].p[j].within(shipCollectionMin, shipCollectionMax) && (s.inventory[i]+len(s.collecting[i])) < 100 && !(s.shipInFootZone && b.i[i].v[j][1] > 0) {
+				if ii.canHold() && b.i[i].p[j].within(shipCollectionMin, shipCollectionMax) && (s.inventory[i]+len(s.collecting[i])) < 100 && !(s.shipInFootZone && b.i[i].v[j][1] > 0) {
 					s.collecting[i] = append(s.collecting[i], b.i[i].pop(j))
 					j--
 					continue jLoop
 				}
 			}
 
+			if storeInTile {
+				if s.tileItems[xTile][yTile][i] < maxItems[tt][i] {
+					s.tileItems[xTile][yTile][i]++
+					b.i[i].pop(j)
+					j--
+					continue jLoop
+				} else {
+					fade = true
+				}
+			}
+			if fade {
+				s.fader(b.i[i].pop(j), item(i))
+				j--
+				continue jLoop
+			}
+
 			if b.i[i].p[j][1] > s.foot+0.5 && b.i[i].p[j][1] < s.foot+2.5 {
 				if b.i[i].p[j][0] > 3 && b.i[i].p[j][0] < 5 {
 					if b.i[i].p[j][0] > 3.25 && b.i[i].p[j][0] < 4.75 && b.i[i].p[j][1] < s.foot+1 && b.i[i].v[j][1] > 0 {
 						s.footInv[i]++
+						b.i[i].pop(j)
+					} else {
+						s.fader(b.i[i].pop(j), item(i))
 					}
-					b.i[i].pop(j)
 					j--
 					continue jLoop
 				}
 			}
 
-			b.i[i].p[j][0] += b.i[i].v[j][0] * dt
-			b.i[i].p[j][1] += b.i[i].v[j][1] * dt
-
-			if b.i[i].p[j][0] < -1.5 || b.i[i].p[j][0] > spritesPerWidth+0.5 || b.i[i].p[j][1] < -30 || b.i[i].p[j][1] > worldHeight+30 {
+			if b.i[i].p[j][0] < -1.5 || b.i[i].p[j][0] > spritesPerWidth+0.5 || b.i[i].p[j][1] < -30 || b.i[i].p[j][1] > 150 {
 				b.i[i].pop(j)
 				j--
 			}
@@ -963,7 +1293,7 @@ func (rb *rockband) step(dt float64) {
 	}
 }
 
-const worldHeight = 300
+const worldHeight = 200
 
 // const worldHeight = 100
 
