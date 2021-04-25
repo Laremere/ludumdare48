@@ -145,7 +145,7 @@ func (r *render) render() {
 	r.viewTop = s.viewy - r.halfHeight/r.spriteSize - 2
 	r.viewBottom = s.viewy + r.halfHeight/r.spriteSize + 4
 
-	r.ctx.Set("fillStyle", "#000000")
+	r.ctx.Set("fillStyle", "#111111")
 	r.ctx.Call("fillRect", 0, 0, r.width, r.height)
 
 	r.draw("station", vec{spritesPerWidth / 2, -3}, 5, 5)
@@ -857,7 +857,7 @@ func (b *band) step(dt float64, bandIndex int) {
 			// 	}
 			// case extractor, weaver, fabricator, laser:
 			case extractor:
-				
+
 			case empty:
 				if b.i[i].p[j].within(shipCollectionMin, shipCollectionMax) && (s.inventory[i]+len(s.collecting[i])) < 100 && !(s.shipInFootZone && b.i[i].v[j][1] > 0) {
 					s.collecting[i] = append(s.collecting[i], b.i[i].pop(j))
@@ -871,7 +871,7 @@ func (b *band) step(dt float64, bandIndex int) {
 					if b.i[i].p[j][0] > 3.25 && b.i[i].p[j][0] < 4.75 && b.i[i].p[j][1] < s.foot+1 && b.i[i].v[j][1] > 0 {
 						s.footInv[i]++
 					}
-					s.fader(b.i[i].pop(j), item(i))
+					b.i[i].pop(j)
 					j--
 					continue jLoop
 				}
