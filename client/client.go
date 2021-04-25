@@ -67,6 +67,8 @@ type client struct {
 }
 
 func (c *client) animationFrame(this js.Value, args []js.Value) interface{} {
+	stepStart := js.Global().Get("window").Get("performance").Call("now").Int()
+	stepEnd := stepStart
 	timestamp := args[0].Float()
 	if c.lasttimestamp != 0 {
 		dt := (timestamp - c.lasttimestamp) / 1000
@@ -74,6 +76,7 @@ func (c *client) animationFrame(this js.Value, args []js.Value) interface{} {
 			dt = 1.0 / 20
 		}
 		s.step(dt)
+		stepEnd = js.Global().Get("window").Get("performance").Call("now").Int()
 
 		for k := range s.keyDown {
 			s.keyDown[k] = false
@@ -84,6 +87,10 @@ func (c *client) animationFrame(this js.Value, args []js.Value) interface{} {
 	}
 	c.lasttimestamp = timestamp
 	c.r.render()
+	renderEnd := js.Global().Get("window").Get("performance").Call("now").Int()
+
+	c.r.ctx.Call("fillText", fmt.Sprintf("Step time:   %d", stepEnd-stepStart), 300, 60)
+	c.r.ctx.Call("fillText", fmt.Sprintf("Render time: %d", renderEnd-stepEnd), 300, 90)
 
 	js.Global().Get("window").Call("requestAnimationFrame", c.animationFrameJs)
 	return nil
@@ -248,6 +255,8 @@ func (r *render) onscreen(min, max float64) bool {
 
 type state struct {
 	ship           transform
+	destination    vec
+	hasDestination bool
 	inventory      [numItems]int
 	collecting     [numItems][]transform
 	sending        []sending
@@ -383,14 +392,31 @@ func (s *state) step(dt float64) {
 		}
 
 		clamp(&s.ship.v[1], -5, 5)
-		if coasting && math.Abs(s.ship.v[0]) < 2.5 && math.Abs(s.ship.v[1]) < 2.5 {
-			s.ship.v[0] *= math.Pow(0.1, dt)
-			s.ship.v[1] *= math.Pow(0.1, dt)
-			s.ship.p = s.ship.p.tween(s.ship.p.floor().add(vec{0.5, 0.5}), dt)
+		if !coasting {
+			s.hasDestination = false
 		}
-		if coasting && math.Abs(s.ship.v[0]) < 0.1 && math.Abs(s.ship.v[1]) < 0.1 {
-			s.ship.v[0] = 0
-			s.ship.v[1] = 0
+		if coasting && math.Abs(s.ship.v[0]) < 4 && math.Abs(s.ship.v[1]) < 4 {
+			if !s.hasDestination {
+				if math.Abs(s.ship.v[0]) > math.Abs(s.ship.v[1]) {
+					if s.ship.v[0] < 0 {
+						s.destination = s.ship.p.floor().add(vec{-0.5, 0.5})
+					} else {
+						s.destination = s.ship.p.floor().add(vec{1.5, 0.5})
+					}
+				} else {
+					if s.ship.v[1] < 0 {
+						s.destination = s.ship.p.floor().add(vec{0.5, -0.5})
+					} else {
+						s.destination = s.ship.p.floor().add(vec{0.5, 1.5})
+					}
+				}
+
+				s.ship.v[0] = 0
+				s.ship.v[1] = 0
+				s.hasDestination = true
+
+			}
+			s.ship.p = s.ship.p.tween(s.destination, dt*3)
 		}
 
 		s.ship.applyVelocity(dt)
@@ -456,7 +482,7 @@ func (s *state) step(dt float64) {
 	}
 
 	// Used in bands to prevent re-pickup
-	s.shipInFootZone = s.ship.p[0] > 3.25 && s.ship.p[0] < 4.75 && s.ship.p[1] < s.foot && s.ship.p[1] > s.foot-2
+	s.shipInFootZone = s.ship.p[0] > 3.25 && s.ship.p[0] < 4.75 && s.ship.p[1] < s.foot+1 && s.ship.p[1] > s.foot-2
 	{
 		if s.dropCooldown > 0 {
 			s.dropCooldown -= dt
