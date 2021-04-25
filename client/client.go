@@ -143,11 +143,11 @@ func (r *render) render() {
 
 	r.draw("station", vec{spritesPerWidth / 2, -3}, 5, 5)
 
-	tileTop := int(r.viewTop)
+	tileTop := int(math.Floor(r.viewTop))
 	if tileTop < 0 {
 		tileTop = 0
 	}
-	tileBottom := int(r.viewBottom)
+	tileBottom := int(math.Ceil(r.viewBottom))
 	if tileBottom >= len(s.tiles[0]) {
 		tileBottom = len(s.tiles[0]) - 1
 	}
@@ -257,7 +257,7 @@ type state struct {
 	key            map[key]bool
 	keyUp          map[key]bool
 	rocks          []*rockband
-	tiles          [spritesPerWidth - 1][worldHeight / 2]tile
+	tiles          [spritesPerWidth - 1][worldHeight]tile
 	bands          [numBands]*band
 	scaffoldings   int
 	foot           float64
@@ -275,8 +275,8 @@ const (
 	forge
 	redirectorUp
 	redirectorLeft
-	redirectorRight
 	redirectorDown
+	redirectorRight
 	numTiles
 )
 
@@ -284,14 +284,33 @@ var tileSprite = map[tile]string{
 	forge:           "forge",
 	redirectorUp:    "redirectorUp",
 	redirectorLeft:  "redirectorLeft",
-	redirectorRight: "redirectorRight",
 	redirectorDown:  "redirectordown",
+	redirectorRight: "redirectorRight",
+}
+
+var tileCost = map[tile]map[item]int{
+	forge: {
+		rock: 40,
+	},
+	redirectorUp: {
+		metal: 25,
+	},
+	redirectorLeft: {
+		metal: 25,
+	},
+	redirectorDown: {
+		metal: 25,
+	},
+	redirectorRight: {
+		metal: 25,
+	},
 }
 
 type sending struct {
-	dst transform
-	p   vec
-	i   item
+	dst       transform
+	p         vec
+	i         item
+	dontspawn bool
 }
 
 func init() {
@@ -367,6 +386,7 @@ func (s *state) step(dt float64) {
 		if coasting && math.Abs(s.ship.v[0]) < 2.5 && math.Abs(s.ship.v[1]) < 2.5 {
 			s.ship.v[0] *= math.Pow(0.1, dt)
 			s.ship.v[1] *= math.Pow(0.1, dt)
+			s.ship.p = s.ship.p.tween(s.ship.p.floor().add(vec{0.5, 0.5}), dt)
 		}
 		if coasting && math.Abs(s.ship.v[0]) < 0.1 && math.Abs(s.ship.v[1]) < 0.1 {
 			s.ship.v[0] = 0
@@ -381,11 +401,44 @@ func (s *state) step(dt float64) {
 	}
 
 	if s.keyDown[keyZ] {
-		if s.tileAt(s.ship.p) == empty {
-			xTile := int(s.ship.p[0])
-			yTile := int(s.ship.p[1])
-			if !(xTile < 0 || yTile < 0 || xTile >= len(s.tiles) || yTile >= len(s.tiles[0]) || yTile >= s.scaffoldings) {
-				s.tiles[xTile][yTile] = s.buildSelector
+		xTile, yTile := s.ship.p.tilePos()
+		if !(xTile < 0 || yTile < 0 || xTile >= len(s.tiles) || yTile >= len(s.tiles[0]) || yTile >= s.scaffoldings) {
+			if s.tileAt(s.ship.p) == empty {
+				canAfford := true
+				for i, cost := range tileCost[s.buildSelector] {
+					fmt.Println(i, s.inventory[i], cost)
+					if s.inventory[i] < cost {
+						canAfford = false
+					}
+				}
+				if canAfford {
+					s.tiles[xTile][yTile] = s.buildSelector
+					for i, cost := range tileCost[s.buildSelector] {
+						fmt.Println(i, s.inventory[i], cost)
+						s.inventory[i] -= cost
+						for j := 0; j < cost; j++ {
+
+							s.sending = append(s.sending, sending{
+								dst: transform{
+									p: s.ship.p.floor().add(vec{rand.Float64(), rand.Float64()}),
+								},
+								p:         s.ship.p,
+								i:         i,
+								dontspawn: true,
+							})
+						}
+					}
+				}
+			} else if s.buildSelector == empty {
+				for i, cost := range tileCost[s.tiles[xTile][yTile]] {
+					for j := 0; j < cost; j++ {
+						s.pushItem(transform{
+							p: s.ship.p.floor().add(vec{0.1 + rand.Float64()*0.8, 0.1 + rand.Float64()*0.8}),
+							v: vec{rand.Float64() - 0.5, rand.Float64() - 0.5}.norm().scale(0.1),
+						}, i)
+					}
+				}
+				s.tiles[xTile][yTile] = empty
 			}
 		}
 	}
@@ -404,7 +457,6 @@ func (s *state) step(dt float64) {
 
 	// Used in bands to prevent re-pickup
 	s.shipInFootZone = s.ship.p[0] > 3.25 && s.ship.p[0] < 4.75 && s.ship.p[1] < s.foot && s.ship.p[1] > s.foot-2
-	fmt.Println(s.shipInFootZone)
 	{
 		if s.dropCooldown > 0 {
 			s.dropCooldown -= dt
@@ -419,7 +471,7 @@ func (s *state) step(dt float64) {
 				i: rock,
 			})
 			s.inventory[rock]--
-			s.dropCooldown += 0.5
+			s.dropCooldown += 0.1
 		}
 
 		if s.dropCooldown <= 0 && s.shipInFootZone {
@@ -434,7 +486,7 @@ func (s *state) step(dt float64) {
 						i: i,
 					})
 					s.inventory[i]--
-					s.dropCooldown += 0.5
+					s.dropCooldown += 0.1
 					break
 				}
 			}
@@ -445,7 +497,9 @@ func (s *state) step(dt float64) {
 	for i := 0; i < len(s.sending); i++ {
 		s.sending[i].p = s.sending[i].p.tween(s.sending[i].dst.p, dt)
 		if s.sending[i].p[0] == s.sending[i].dst.p[0] && s.sending[i].p[1] == s.sending[i].dst.p[1] {
-			s.pushItem(s.sending[i].dst, s.sending[i].i)
+			if !s.sending[i].dontspawn {
+				s.pushItem(s.sending[i].dst, s.sending[i].i)
+			}
 			last := len(s.sending) - 1
 			s.sending[i] = s.sending[last]
 			s.sending = s.sending[:last]
@@ -514,7 +568,7 @@ func (s *state) step(dt float64) {
 const shipSize = 0.5
 
 func (s *state) pushItem(i transform, t item) {
-	bi := int(i.p[1] / bandHeight)
+	bi := int(math.Floor(i.p[1] / bandHeight))
 	s.bands[bi].i[t].push(i)
 }
 
@@ -603,7 +657,7 @@ func (b *band) step(dt float64, bandIndex int) {
 					continue jLoop
 				}
 			case empty:
-				if b.i[i].p[j].within(shipCollectionMin, shipCollectionMax) && (s.inventory[i]+len(s.collecting[i])) < 100 && !s.shipInFootZone {
+				if b.i[i].p[j].within(shipCollectionMin, shipCollectionMax) && (s.inventory[i]+len(s.collecting[i])) < 100 && !(s.shipInFootZone && b.i[i].v[j][1] > 0) {
 					s.collecting[i] = append(s.collecting[i], b.i[i].pop(j))
 					j--
 					continue jLoop
@@ -634,8 +688,7 @@ func (b *band) step(dt float64, bandIndex int) {
 
 func (s *state) tileAt(v vec) tile {
 	// vTile := v.TilePos()
-	xTile := int(v[0])
-	yTile := int(v[1])
+	xTile, yTile := v.tilePos()
 	if xTile < 0 || yTile < 0 || xTile >= len(s.tiles) || yTile >= len(s.tiles[0]) {
 		return empty
 	}
@@ -707,7 +760,9 @@ func (rb *rockband) step(dt float64) {
 	}
 }
 
-const worldHeight = 100
+const worldHeight = 300
+
+// const worldHeight = 100
 
 // const worldHeight = 1000
 
@@ -783,4 +838,9 @@ func (v vec) floor() vec {
 
 func (v vec) within(min, max vec) bool {
 	return v[0] >= min[0] && v[0] <= max[0] && v[1] >= min[1] && v[1] <= max[1]
+}
+
+func (v vec) tilePos() (x, y int) {
+	v2 := v.floor()
+	return int(v2[0]), int(v2[1])
 }
