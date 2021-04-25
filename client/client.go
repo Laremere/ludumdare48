@@ -177,10 +177,21 @@ func (r *render) render() {
 	}
 
 	////////////////////////////move items to below tiles
-	for _, b := range s.bands {
-		for itemName, i := range b.i {
-			for _, pos := range i.p {
-				r.draw(itemSprite[item(itemName)], pos, 0.1, 0.1)
+
+	{
+		minBand := int(math.Floor(r.viewTop / bandHeight))
+		if minBand < 0 {
+			minBand = 0
+		}
+		maxBand := int(math.Floor(r.viewBottom/bandHeight)) + 1
+		if maxBand >= len(s.bands) {
+			maxBand = len(s.bands) - 1
+		}
+		for _, b := range s.bands[minBand:maxBand] {
+			for itemName, i := range b.i {
+				for _, pos := range i.p {
+					r.draw(itemSprite[item(itemName)], pos, 0.1, 0.1)
+				}
 			}
 		}
 	}
@@ -348,6 +359,12 @@ func init() {
 		// scaffoldings: 1,
 		// foot:         1,
 	}
+
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// cheat, remove
+	for i := item(0); i < numItems; i++ {
+		s.inventory[i] = 9999999
+	}
+	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// cheat, remove
 
 	for i := 0; i < numBands; i++ {
 		s.bands[i] = &band{}
@@ -540,7 +557,53 @@ func (s *state) step(dt float64) {
 	for i, b := range s.bands {
 		b.step(dt, i)
 	}
+
 	// TODO: move items to new bands
+	{
+		// moveUps := 0
+		// moveDowns := 0
+		minY := float64(-1000) // first band holds things going vertically
+		maxY := float64(bandHeight)
+		for j, b := range s.bands {
+			// fmt.Println("BAND", j, minY, maxY)
+			for i := range b.i {
+				for k := 0; k < len(b.i[i].p); k++ {
+					// fmt.Println(b.i[i].p[k][0])
+					if b.i[i].p[k][1] < minY {
+						s.bands[j-1].i[i].push(b.i[i].pop(k))
+						k--
+						// moveUps++
+						continue
+					}
+					if b.i[i].p[k][1] >= maxY {
+						s.bands[j+1].i[i].push(b.i[i].pop(k))
+						k--
+						// moveDowns++
+						continue
+					}
+				}
+			}
+			minY = maxY
+			maxY += bandHeight
+			if j == len(s.bands)-1 {
+				maxY += worldHeight // should be enough, lol
+			}
+		}
+		// fmt.Println("UP", moveUps, "DOWN", moveDowns)
+	}
+
+	// {
+	// 	bandPopulation := []int{}
+	// 	for _, b := range s.bands {
+	// 		sum := 0
+	// 		for i := range b.i {
+	// 			sum += len(b.i[i].p)
+	// 		}
+	// 		bandPopulation = append(bandPopulation, sum)
+	// 	}
+	// 	fmt.Println(bandPopulation)
+	// 	panic("AT THE DISCO")
+	// }
 
 	for i := range s.collecting {
 		for j := 0; j < len(s.collecting[i]); j++ {
@@ -741,7 +804,7 @@ func (is *items) push(pi transform) {
 	is.v = append(is.v, pi.v)
 }
 
-const bandHeight = 20
+const bandHeight = 10
 const numBands = worldHeight / bandHeight
 
 func init() {
