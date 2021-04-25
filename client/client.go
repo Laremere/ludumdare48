@@ -247,23 +247,25 @@ func (r *render) onscreen(min, max float64) bool {
 }
 
 type state struct {
-	ship         transform
-	inventory    [numItems]int
-	collecting   [numItems][]transform
-	sending      []sending
-	viewx, viewy float64
-	dropCooldown float64
-	keyDown      map[key]bool
-	key          map[key]bool
-	keyUp        map[key]bool
-	rocks        []*rockband
-	tiles        [spritesPerWidth - 1][worldHeight / 2]tile
-	bands        [numBands]*band
-	scaffoldings int
-	foot         float64
-	footInv      [numItems]int
+	ship           transform
+	inventory      [numItems]int
+	collecting     [numItems][]transform
+	sending        []sending
+	viewx, viewy   float64
+	dropCooldown   float64
+	keyDown        map[key]bool
+	key            map[key]bool
+	keyUp          map[key]bool
+	rocks          []*rockband
+	tiles          [spritesPerWidth - 1][worldHeight / 2]tile
+	bands          [numBands]*band
+	scaffoldings   int
+	foot           float64
+	footInv        [numItems]int
+	shipInFootZone bool
 
-	buildSelector tile
+	buildSelector   tile
+	scaffoldingCost [numItems]int
 }
 
 type tile int
@@ -400,6 +402,9 @@ func (s *state) step(dt float64) {
 		}
 	}
 
+	// Used in bands to prevent re-pickup
+	s.shipInFootZone = s.ship.p[0] > 3.25 && s.ship.p[0] < 4.75 && s.ship.p[1] < s.foot && s.ship.p[1] > s.foot-2
+	fmt.Println(s.shipInFootZone)
 	{
 		if s.dropCooldown > 0 {
 			s.dropCooldown -= dt
@@ -416,6 +421,25 @@ func (s *state) step(dt float64) {
 			s.inventory[rock]--
 			s.dropCooldown += 0.5
 		}
+
+		if s.dropCooldown <= 0 && s.shipInFootZone {
+			for i := item(0); i < numItems; i++ {
+				if s.inventory[i] > 0 && s.scaffoldingCost[i] > s.footInv[i] {
+					s.sending = append(s.sending, sending{
+						dst: transform{
+							p: vec{3.5 + rand.Float64(), s.foot + 0.5},
+							v: vec{0, 1},
+						},
+						p: s.ship.p,
+						i: i,
+					})
+					s.inventory[i]--
+					s.dropCooldown += 0.5
+					break
+				}
+			}
+		}
+
 	}
 
 	for i := 0; i < len(s.sending); i++ {
@@ -461,22 +485,22 @@ func (s *state) step(dt float64) {
 				s.foot = float64(s.scaffoldings)
 			}
 		} else {
-			var cost [numItems]int
+			s.scaffoldingCost = [numItems]int{}
 			if s.scaffoldings > 3 && s.scaffoldings <= 10 {
-				cost[rock] += 5
+				s.scaffoldingCost[rock] += 5
 			}
 			if s.scaffoldings > 10 {
-				cost[metal] += s.scaffoldings
+				s.scaffoldingCost[metal] += s.scaffoldings
 			}
 			canbuildnext := true
-			for i := range cost {
-				if cost[i] > s.footInv[i] {
+			for i := range s.scaffoldingCost {
+				if s.scaffoldingCost[i] > s.footInv[i] {
 					canbuildnext = false
 				}
 			}
 			if canbuildnext {
-				for i := range cost {
-					s.footInv[i] -= cost[i]
+				for i := range s.scaffoldingCost {
+					s.footInv[i] -= s.scaffoldingCost[i]
 				}
 				s.scaffoldings++
 			}
@@ -579,7 +603,7 @@ func (b *band) step(dt float64, bandIndex int) {
 					continue jLoop
 				}
 			case empty:
-				if b.i[i].p[j].within(shipCollectionMin, shipCollectionMax) && (s.inventory[i]+len(s.collecting[i])) < 100 {
+				if b.i[i].p[j].within(shipCollectionMin, shipCollectionMax) && (s.inventory[i]+len(s.collecting[i])) < 100 && !s.shipInFootZone {
 					s.collecting[i] = append(s.collecting[i], b.i[i].pop(j))
 					j--
 					continue jLoop
@@ -588,7 +612,7 @@ func (b *band) step(dt float64, bandIndex int) {
 
 			if b.i[i].p[j][1] > s.foot+0.5 && b.i[i].p[j][1] < s.foot+2.5 {
 				if b.i[i].p[j][0] > 3 && b.i[i].p[j][0] < 5 {
-					if b.i[i].p[j][0] > 2.25 && b.i[i].p[j][0] < 4.75 && b.i[i].p[j][1] < s.foot+1 && b.i[i].v[j][1] > 0 {
+					if b.i[i].p[j][0] > 3.25 && b.i[i].p[j][0] < 4.75 && b.i[i].p[j][1] < s.foot+1 && b.i[i].v[j][1] > 0 {
 						s.footInv[i]++
 					}
 					b.i[i].pop(j)
