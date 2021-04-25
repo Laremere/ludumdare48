@@ -1,4 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
 <svg viewBox="0 0 500 500" width="500" height="500" xmlns="http://www.w3.org/2000/svg">
-  <circle style="stroke: rgb(0, 0, 0); fill: rgb(163, 126, 16);" cx="246.573" cy="245.889" r="232.683"/>
+  <defs>
+    <radialGradient gradientUnits="userSpaceOnUse" cx="283.809" cy="239.672" r="199.817" id="gradient-0" gradientTransform="matrix(0.875492, 0.283181, -0.405347, 1.25318, 132.486649, -141.049316)">
+      <stop offset="0" style="stop-color: rgb(227, 3, 3);"/>
+      <stop offset="0.571" style="stop-color: rgb(182, 85, 43);"/>
+      <stop offset="1" style="stop-color: rgba(121, 56, 29, 1)"/>
+    </radialGradient>
+    <linearGradient gradientUnits="userSpaceOnUse" x1="248.445" y1="45.749" x2="248.445" y2="445.383" id="gradient-2" gradientTransform="matrix(-0.16636, -0.986065, 1.055955, -0.17815, 37.840685, 554.106607)">
+      <stop offset="0" style="stop-color: rgb(255, 6, 234);"/>
+      <stop offset="1" style="stop-color: rgba(57, 34, 74, 1)"/>
+    </linearGradient>
+  </defs>
+  <g transform="matrix(1, 0, 0, 1, 1.709145, 0)">
+    <rect y="-130" width="125" height="125" style="fill: rgb(216, 216, 216);"/>
+    <rect y="-130" width="125" height="125" style="fill: rgb(216, 216, 216);" x="375"/>
+    <rect width="125" height="125" style="fill: rgb(216, 216, 216);" x="505"/>
+    <rect width="125" height="125" style="fill: rgb(216, 216, 216);" x="-130"/>
+    <rect width="125" height="125" style="fill: rgb(216, 216, 216);" x="-130" y="375"/>
+    <rect width="125" height="125" style="fill: rgb(216, 216, 216);" y="505"/>
+    <rect y="505" width="125" height="125" style="fill: rgb(216, 216, 216);" x="375"/>
+    <rect width="125" height="125" style="fill: rgb(216, 216, 216);" x="505" y="375"/>
+  </g>
+  <rect x="0.049" y="-0.057" width="72.124" height="72.124" style="fill: rgb(103, 39, 0);"/>
+  <rect x="-175.521" y="105.038" width="32.147" height="99.737" style="fill: rgb(103, 39, 0);" transform="matrix(0.707107, -0.707107, 0.707107, 0.707107, 83.391869, -139.676193)"/>
+  <rect x="0.049" y="-0.057" width="72.124" height="72.124" style="fill: rgb(103, 39, 0);" transform="matrix(0, 1, -1, 0, 499.935638, 0.548665)"/>
+  <rect x="-175.521" y="105.038" width="32.147" height="99.737" style="fill: rgb(103, 39, 0);" transform="matrix(0.707107, 0.707107, -0.707107, 0.707107, 639.611816, 83.940529)"/>
+  <rect x="-499.772" y="-499.609" width="72.124" height="72.124" style="fill: rgb(103, 39, 0);" transform="matrix(-1, 0, 0, -1, 0, 0)"/>
+  <rect x="-175.521" y="105.038" width="32.147" height="99.737" style="fill: rgb(103, 39, 0);" transform="matrix(-0.707107, 0.707107, -0.707107, -0.707107, 416.430023, 639.228271)"/>
+  <rect x="-499.772" y="-499.609" width="72.124" height="72.124" style="fill: rgb(103, 39, 0);" transform="matrix(0, -1, 1, 0, 498.960388, 1.054649)"/>
+  <rect x="-175.521" y="105.038" width="32.147" height="99.737" style="fill: rgb(103, 39, 0);" transform="matrix(-0.707107, -0.707107, 0.707107, -0.707107, -140.267853, 417.48468)"/>
+  <circle style="fill: url(#gradient-0); stroke: url(#gradient-2); stroke-width: 9px;" cx="248.445" cy="245.566" r="199.817"/>
+  <rect x="17.679" y="15.288" width="34.432" height="33.722" style="fill: rgb(70, 70, 70);"/>
+  <rect x="10.573" y="445.743" width="15.132" height="44.369" style="fill: rgb(70, 70, 70);"/>
+  <rect x="34.168" y="448.302" width="24.364" height="16.157" style="fill: rgb(70, 70, 70);"/>
+  <rect x="34.647" y="468.284" width="24.364" height="16.157" style="fill: rgb(70, 70, 70);"/>
+  <rect x="429.468" y="19.31" width="34.432" height="33.722" style="fill: rgb(70, 70, 70);" transform="matrix(0.707107, 0.707107, -0.707107, 0.707107, 173.203751, -306.308716)"/>
+  <rect x="448.365" y="447.621" width="34.432" height="33.722" style="fill: rgb(70, 70, 70);"/>
 </svg>

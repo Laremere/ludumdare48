@@ -170,16 +170,6 @@ func (r *render) render() {
 		}
 	}
 
-	r.draw("foot", vec{spritesPerWidth / 2, s.foot + 1.5}, 2, 2)
-
-	for x := 0; x < len(s.tiles); x++ {
-		for y := tileTop; y < tileBottom; y++ {
-			if s.tiles[x][y] != empty {
-				r.draw(tileSprite[s.tiles[x][y]], vec{(float64(x) + 0.5), float64(y) + 0.5}, 1, 1)
-			}
-		}
-	}
-
 	////////////////////////////move items to below tiles
 
 	{
@@ -204,18 +194,34 @@ func (r *render) render() {
 			r.draw(itemSprite[item(i)], s.collecting[i][j].p, 0.1, 0.1)
 		}
 	}
-	for i := range s.sending {
-		r.draw(itemSprite[s.sending[i].i], s.sending[i].p, 0.1, 0.1)
-	}
 	////////////////////////////move items to below tiles
+	r.draw("foot", vec{spritesPerWidth / 2, s.foot + 1.25}, 2, 2)
+
+	for x := 0; x < len(s.tiles); x++ {
+		for y := tileTop; y < tileBottom; y++ {
+			if s.tiles[x][y] != empty {
+				r.draw(tileSprite[s.tiles[x][y]], vec{(float64(x) + 0.5), float64(y) + 0.5}, 1, 1)
+			}
+		}
+	}
 
 	for _, f := range s.faders {
 		r.draw(itemSprite[f.i], f.t.p, f.s, f.s)
 	}
 
+	for i := range s.sending {
+		r.draw(itemSprite[s.sending[i].i], s.sending[i].p, 0.1, 0.1)
+	}
+
 	r.draw("ship", s.ship.p, shipSize, shipSize) // ALWAYS DRAW LAST, except for UI
 
 	{
+		{
+			guiHeight := r.height / 4
+			guiWidth := guiHeight * 10
+			r.ctx.Call("drawImage", image("gui"), r.width/2-guiWidth/2, r.height-guiHeight, guiWidth, r.height/4)
+		}
+
 		totalItems := 0
 		for _, b := range s.bands {
 			for _, i := range b.i {
@@ -480,9 +486,9 @@ func init() {
 	}
 
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// cheat, remove
-	// for i := item(0); i < numItems; i++ {
-	// 	s.inventory[i] = 9999999
-	// }
+	for i := item(0); i < numItems; i++ {
+		s.inventory[i] = 9999999
+	}
 	// s.scaffoldings = worldHeight
 	// s.footSpeed = 6
 	//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////// cheat, remove

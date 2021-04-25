@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <svg viewBox="0 0 500 500" width="500" height="500" xmlns="http://www.w3.org/2000/svg">
-  <ellipse style="fill: rgb(33, 43, 154);" transform="matrix(-0.00369, 0.999993, -0.999993, -0.00369, 591.992432, -8.519424)" cx="247.006" cy="335.487" rx="215.573" ry="125.532"/>
+  <path d="M 250.429 12.136 L 384.376 277.799 C 528.75 568.72 -8.792 574.317 133.224 267.753 L 250.429 12.136 Z" style="stroke: rgb(0, 0, 0); fill: rgb(0, 119, 255);"/>
 </svg>
