@@ -205,6 +205,10 @@ func (r *render) render() {
 	}
 	////////////////////////////move items to below tiles
 
+	for _, f := range s.faders {
+		r.draw(itemSprite[f.i], f.t.p, f.s, f.s)
+	}
+
 	r.draw("ship", s.ship.p, shipSize, shipSize) // ALWAYS DRAW LAST, except for UI
 
 	{
@@ -230,7 +234,7 @@ func (r *render) render() {
 			selected = tileSprite[s.buildSelector]
 		}
 
-		r.ctx.Call("drawImage", image(selected), 0, y, 50, 50)
+		r.ctx.Call("drawImage", image(selected), 0, y, 100, 100)
 	}
 }
 
@@ -278,11 +282,13 @@ type state struct {
 	keyUp          map[key]bool
 	rocks          []*rockband
 	tiles          [spritesPerWidth - 1][worldHeight]tile
+	tileItems      [spritesPerWidth - 1][worldHeight][numItems]int16
 	bands          [numBands]*band
 	scaffoldings   int
 	foot           float64
 	footInv        [numItems]int
 	shipInFootZone bool
+	faders         []fader
 
 	buildSelector   tile
 	scaffoldingCost [numItems]int
@@ -292,20 +298,67 @@ type tile int
 
 const (
 	empty = tile(iota)
+	extractor
+	filter
+	weaver
+	fabricator
+	fan
+	laser
+	core
+	boiler
+	turbine
+
 	forge
 	redirectorUp
 	redirectorLeft
 	redirectorDown
 	redirectorRight
+	splitter
 	numTiles
 )
 
+var maxItems = map[tile][numItems]int16{
+	extractor: {
+		ice: 100,
+	},
+	weaver: {
+		carbon: 10,
+	},
+	fabricator: {
+		helium:  100,
+		silicon: 10,
+	},
+	laser: {
+		hydrogen: 10,
+	},
+	core: {
+		plasma: 10000,
+	},
+	boiler: {
+		water: 100,
+		//plasma: 1, // boiler needs plasma temp logic.
+	},
+}
+
+// var inputSide
+
 var tileSprite = map[tile]string{
+	extractor:  "extractor",
+	filter:     "waterextractor",
+	weaver:     "weaver",
+	fabricator: "fabricator",
+	fan:        "fan",
+	laser:      "laser",
+	core:       "core",
+	boiler:     "boiler",
+	turbine:    "turbine",
+
 	forge:           "forge",
 	redirectorUp:    "redirectorUp",
 	redirectorLeft:  "redirectorLeft",
 	redirectorDown:  "redirectordown",
 	redirectorRight: "redirectorRight",
+	splitter:        "splitter",
 }
 
 var tileCost = map[tile]map[item]int{
@@ -558,6 +611,18 @@ func (s *state) step(dt float64) {
 		b.step(dt, i)
 	}
 
+	for i := 0; i < len(s.faders); i++ {
+		s.faders[i].s -= dt / 10
+		if s.faders[i].s <= 0 {
+			last := len(s.faders) - 1
+			s.faders[i] = s.faders[last]
+			s.faders = s.faders[:last]
+			i--
+			continue
+		}
+		s.faders[i].t.applyVelocity(dt)
+	}
+
 	// TODO: move items to new bands
 	{
 		// moveUps := 0
@@ -566,6 +631,9 @@ func (s *state) step(dt float64) {
 		maxY := float64(bandHeight)
 		for j, b := range s.bands {
 			// fmt.Println("BAND", j, minY, maxY)
+			if j == len(s.bands)-1 {
+				maxY += worldHeight // should be enough, lol
+			}
 			for i := range b.i {
 				for k := 0; k < len(b.i[i].p); k++ {
 					// fmt.Println(b.i[i].p[k][0])
@@ -585,11 +653,16 @@ func (s *state) step(dt float64) {
 			}
 			minY = maxY
 			maxY += bandHeight
-			if j == len(s.bands)-1 {
-				maxY += worldHeight // should be enough, lol
-			}
 		}
 		// fmt.Println("UP", moveUps, "DOWN", moveDowns)
+
+		for _, b := range s.bands {
+			for i := range b.i {
+				for len(b.i[i].p) > 200 {
+					s.fader(b.i[i].pop(rand.Intn(len(b.i[i].p))), item(i))
+				}
+			}
+		}
 	}
 
 	// {
@@ -661,6 +734,22 @@ func (s *state) pushItem(i transform, t item) {
 	s.bands[bi].i[t].push(i)
 }
 
+func (s *state) fader(t transform, i item) {
+	if math.Abs(t.p[1]-s.ship.p[1]) < 10 {
+		t.v[0] = rand.Float64()*2 - 1
+		t.v[1] = rand.Float64()*2 - 1
+		s.faders = append(s.faders, fader{
+			t, i, 0.1,
+		})
+	}
+}
+
+type fader struct {
+	t transform
+	i item
+	s float64
+}
+
 type rockband struct {
 	nextSpawn float64
 	// t         []transform
@@ -674,12 +763,33 @@ type item byte
 const (
 	rock = item(iota)
 	metal
+	ice
+	carbon
+	silicon
+	nanotubes
+	computer
+	water
+	hydrogen
+	plasma
+	steam
+	helium
+
 	numItems
 )
 
 var itemSprite = map[item]string{
-	rock:  "rock",
-	metal: "metal",
+	rock:      "rock",
+	metal:     "metal",
+	ice:       "ice",
+	carbon:    "carbon",
+	silicon:   "silicon",
+	nanotubes: "nanotubes",
+	computer:  "computer",
+	water:     "water",
+	hydrogen:  "hydrogen",
+	plasma:    "plasma",
+	steam:     "steam",
+	helium:    "helium",
 }
 
 type band struct {
@@ -734,17 +844,20 @@ func (b *band) step(dt float64, bandIndex int) {
 						b.i[i].v[j] = b.i[i].v[j].tween(tilePos.add(vec{0.5, 0.5}).sub(b.i[i].p[j]).norm(), 0.5*dt)
 					}
 				}
-			case forge:
-				if !refTile.within(vec{-1, 0.35}, vec{2, 0.65}) {
-					b.i[i].pop(j)
-					j--
-					continue jLoop
-				}
-				if item(i) == rock && refTile.within(vec{0.35, 0.35}, vec{0.65, 0.65}) {
-					b.i[metal].push(b.i[i].pop(j))
-					j--
-					continue jLoop
-				}
+			// case forge:
+			// 	if !refTile.within(vec{-1, 0.35}, vec{2, 0.65}) {
+			// 		s.fader(b.i[i].pop(j), item(i))
+			// 		j--
+			// 		continue jLoop
+			// 	}
+			// 	if item(i) == rock && refTile.within(vec{0.35, 0.35}, vec{0.65, 0.65}) {
+			// 		b.i[metal].push(b.i[i].pop(j))
+			// 		j--
+			// 		continue jLoop
+			// 	}
+			// case extractor, weaver, fabricator, laser:
+			case extractor:
+				
 			case empty:
 				if b.i[i].p[j].within(shipCollectionMin, shipCollectionMax) && (s.inventory[i]+len(s.collecting[i])) < 100 && !(s.shipInFootZone && b.i[i].v[j][1] > 0) {
 					s.collecting[i] = append(s.collecting[i], b.i[i].pop(j))
@@ -758,7 +871,7 @@ func (b *band) step(dt float64, bandIndex int) {
 					if b.i[i].p[j][0] > 3.25 && b.i[i].p[j][0] < 4.75 && b.i[i].p[j][1] < s.foot+1 && b.i[i].v[j][1] > 0 {
 						s.footInv[i]++
 					}
-					b.i[i].pop(j)
+					s.fader(b.i[i].pop(j), item(i))
 					j--
 					continue jLoop
 				}
@@ -838,7 +951,8 @@ func (rb *rockband) step(dt float64) {
 		}
 		pi.v[0] = math.Sqrt(1/(worldHeight-pi.p[1])) * 5
 		pi.p[0] += pi.v[0] * rb.nextSpawn
-		s.pushItem(pi, rock)
+		// s.pushItem(pi, rock)
+		s.pushItem(pi, ice)
 
 		// i := len(rb.t)
 		// rb.t = append(rb.t, transform{})
