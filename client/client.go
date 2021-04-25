@@ -34,7 +34,9 @@ func main() {
 	js.Global().Get("document").Call("addEventListener", "keydown", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 		e := args[0]
 		k := key(e.Get("keyCode").Int())
-		s.keyDown[k] = true
+		if !s.key[k] {
+			s.keyDown[k] = true
+		}
 		s.key[k] = true
 
 		return nil
@@ -43,7 +45,9 @@ func main() {
 	js.Global().Get("document").Call("addEventListener", "keyup", js.FuncOf(func(this js.Value, args []js.Value) interface{} {
 		e := args[0]
 		k := key(e.Get("keyCode").Int())
-		s.keyUp[k] = true
+		if s.key[k] {
+			s.keyUp[k] = true
+		}
 		s.key[k] = false
 
 		return nil
@@ -148,11 +152,14 @@ func (r *render) render() {
 		tileBottom = len(s.tiles[0]) - 1
 	}
 
+	r.draw("scaffolding", vec{spritesPerWidth / 2, 0}, 1, 1)
 	for y := tileTop; y < tileBottom; y++ {
 		if y < s.scaffoldings {
-			r.draw("scaffolding", vec{spritesPerWidth / 2, float64(y)}, 1, 1)
+			r.draw("scaffolding", vec{spritesPerWidth / 2, 1 + float64(y)}, 1, 1)
 		}
 	}
+
+	r.draw("foot", vec{spritesPerWidth / 2, s.foot + 1.5}, 2, 2)
 
 	for x := 0; x < len(s.tiles); x++ {
 		for y := tileTop; y < tileBottom; y++ {
@@ -162,6 +169,7 @@ func (r *render) render() {
 		}
 	}
 
+	////////////////////////////move items to below tiles
 	for _, b := range s.bands {
 		for itemName, i := range b.i {
 			for _, pos := range i.p {
@@ -174,10 +182,10 @@ func (r *render) render() {
 			r.draw(itemSprite[item(i)], s.collecting[i][j].p, 0.1, 0.1)
 		}
 	}
-
 	for i := range s.sending {
 		r.draw(itemSprite[s.sending[i].i], s.sending[i].p, 0.1, 0.1)
 	}
+	////////////////////////////move items to below tiles
 
 	r.draw("ship", s.ship.p, shipSize, shipSize) // ALWAYS DRAW LAST, except for UI
 
@@ -193,11 +201,18 @@ func (r *render) render() {
 		r.ctx.Set("textAlign", "30px Arial")
 		r.ctx.Call("fillText", fmt.Sprintf("Total items: %v", totalItems), 0, 30)
 		r.ctx.Call("fillText", fmt.Sprintf("X: %0.2f, Y: %0.2f", s.ship.p[0], s.ship.p[1]), 0, 60)
+		y := 95
 		for i := item(0); i < numItems; i++ {
-			y := 95 + 30*int(i)
 			r.ctx.Call("fillText", fmt.Sprintf("%d", s.inventory[i]), 30, y)
 			r.ctx.Call("drawImage", image(itemSprite[i]), 0, y-30, 30, 30)
+			y += 30
 		}
+		selected := "remove"
+		if s.buildSelector != empty {
+			selected = tileSprite[s.buildSelector]
+		}
+
+		r.ctx.Call("drawImage", image(selected), 0, y, 50, 50)
 	}
 }
 
@@ -243,8 +258,12 @@ type state struct {
 	keyUp        map[key]bool
 	rocks        []*rockband
 	tiles        [spritesPerWidth - 1][worldHeight / 2]tile
-	scaffoldings int
 	bands        [numBands]*band
+	scaffoldings int
+	foot         float64
+	footInv      [numItems]int
+
+	buildSelector tile
 }
 
 type tile int
@@ -256,6 +275,7 @@ const (
 	redirectorLeft
 	redirectorRight
 	redirectorDown
+	numTiles
 )
 
 var tileSprite = map[tile]string{
@@ -295,7 +315,8 @@ func init() {
 				height: 10,
 			},
 		},
-		scaffoldings: 2,
+		// scaffoldings: 1,
+		// foot:         1,
 	}
 
 	for i := 0; i < numBands; i++ {
@@ -306,16 +327,16 @@ func init() {
 		speed := math.Sqrt(1/float64(worldHeight)) * 5
 		rb.step(spritesPerWidth / speed)
 	}
-	for x := 0; x < spritesPerWidth-1; x++ {
-		s.tiles[x][0] = forge
-	}
+	// for x := 0; x < spritesPerWidth-1; x++ {
+	// 	s.tiles[x][0] = forge
+	// }
 
-	s.tiles[spritesPerWidth/2][1] = forge
-	s.tiles[spritesPerWidth/2][3] = forge
-	s.tiles[spritesPerWidth/2][5] = forge
-	s.tiles[spritesPerWidth/2-2][1] = redirectorRight
-	s.tiles[spritesPerWidth/2-2][2] = redirectorUp
-	s.tiles[spritesPerWidth/2-2][4] = redirectorUp
+	// s.tiles[spritesPerWidth/2][1] = forge
+	// s.tiles[spritesPerWidth/2][3] = forge
+	// s.tiles[spritesPerWidth/2][5] = forge
+	// s.tiles[spritesPerWidth/2-2][1] = redirectorRight
+	// s.tiles[spritesPerWidth/2-2][2] = redirectorUp
+	// s.tiles[spritesPerWidth/2-2][4] = redirectorUp
 }
 
 func (s *state) step(dt float64) {
@@ -354,6 +375,29 @@ func (s *state) step(dt float64) {
 
 		clampAndReset(&s.ship.p[0], -0.5+shipSize/2, spritesPerWidth-0.5-shipSize/2, &s.ship.v[0])
 		clampAndReset(&s.ship.p[1], -5, worldHeight, &s.ship.v[1])
+		clampAndReset(&s.ship.p[1], -5, s.foot+3, &s.ship.v[1])
+	}
+
+	if s.keyDown[keyZ] {
+		if s.tileAt(s.ship.p) == empty {
+			xTile := int(s.ship.p[0])
+			yTile := int(s.ship.p[1])
+			if !(xTile < 0 || yTile < 0 || xTile >= len(s.tiles) || yTile >= len(s.tiles[0]) || yTile >= s.scaffoldings) {
+				s.tiles[xTile][yTile] = s.buildSelector
+			}
+		}
+	}
+	if s.keyDown[keyX] {
+		s.buildSelector--
+		for s.buildSelector < 0 {
+			s.buildSelector += numTiles
+		}
+	}
+	if s.keyDown[keyC] {
+		s.buildSelector++
+		for s.buildSelector >= numTiles {
+			s.buildSelector -= numTiles
+		}
 	}
 
 	{
@@ -407,6 +451,35 @@ func (s *state) step(dt float64) {
 
 			s.collecting[i][j].v = s.collecting[i][j].v.tween(s.ship.p.sub(s.collecting[i][j].p).norm().scale(10), 10*dt) // .scale(math.Pow(0.9, dt))
 			s.collecting[i][j].applyVelocity(dt)
+		}
+	}
+
+	{
+		if s.foot < float64(s.scaffoldings) {
+			s.foot += dt / 2
+			if s.foot > float64(s.scaffoldings) {
+				s.foot = float64(s.scaffoldings)
+			}
+		} else {
+			var cost [numItems]int
+			if s.scaffoldings > 3 && s.scaffoldings <= 10 {
+				cost[rock] += 5
+			}
+			if s.scaffoldings > 10 {
+				cost[metal] += s.scaffoldings
+			}
+			canbuildnext := true
+			for i := range cost {
+				if cost[i] > s.footInv[i] {
+					canbuildnext = false
+				}
+			}
+			if canbuildnext {
+				for i := range cost {
+					s.footInv[i] -= cost[i]
+				}
+				s.scaffoldings++
+			}
 		}
 	}
 
@@ -508,6 +581,17 @@ func (b *band) step(dt float64, bandIndex int) {
 			case empty:
 				if b.i[i].p[j].within(shipCollectionMin, shipCollectionMax) && (s.inventory[i]+len(s.collecting[i])) < 100 {
 					s.collecting[i] = append(s.collecting[i], b.i[i].pop(j))
+					j--
+					continue jLoop
+				}
+			}
+
+			if b.i[i].p[j][1] > s.foot+0.5 && b.i[i].p[j][1] < s.foot+2.5 {
+				if b.i[i].p[j][0] > 3 && b.i[i].p[j][0] < 5 {
+					if b.i[i].p[j][0] > 2.25 && b.i[i].p[j][0] < 4.75 && b.i[i].p[j][1] < s.foot+1 && b.i[i].v[j][1] > 0 {
+						s.footInv[i]++
+					}
+					b.i[i].pop(j)
 					j--
 					continue jLoop
 				}
